@@ -1,7 +1,8 @@
-export async function matchStarted() {
-  channel.lobby.on("playing", async () => {
-    console.log("Match is now playing");
+import { SupabaseClient } from "@supabase/supabase-js";
+import { changeAllPlayersState } from "../utils/states.ts";
 
-    await changeAllPlayersState(5);
-  });
+export async function matchStarted(supabase: SupabaseClient) {
+  console.log("Match is now playing");
+
+  await changeAllPlayersState(5, supabase);
 }

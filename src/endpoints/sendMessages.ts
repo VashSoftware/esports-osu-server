@@ -1,3 +1,1 @@
-export async function sendMessages(messages: string[]) {
-  console.log(req.body);
-}
+export async function sendMessages(messages: string[], matchId: number) {}

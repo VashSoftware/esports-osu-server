@@ -1,11 +1,17 @@
-export async function message() {
-  channel.on("message", async (message) => {
-    if (message.message.startsWith("close")) {
-      await channel.lobby.closeLobby();
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { changeAllPlayersState } from "../utils/states";
+import type { BanchoMessage, BanchoMultiplayerChannel } from "bancho.js";
 
-      await changeAllPlayersState(1);
+export async function message(
+  message: BanchoMessage,
+  channel: BanchoMultiplayerChannel,
+  supabase: SupabaseClient
+) {
+  if (message.message.startsWith("close")) {
+    await channel.lobby.closeLobby();
 
-      process.exit();
-    }
-  });
+    await changeAllPlayersState(1, supabase);
+
+    process.exit();
+  }
 }

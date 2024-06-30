@@ -23,7 +23,7 @@ app.post("/create-match", async (req: Request, _res: Response) => {
   await createMatch(req.body.id, banchoClient);
 });
 app.post("/send-message", async (req: Request, _res: Response) => {
-  await sendMessages(req.body.messages);
+  await sendMessages(req.body.messages, req.body.matchId);
 });
 
 app.listen(port, () => {

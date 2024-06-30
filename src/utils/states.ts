@@ -1,4 +1,9 @@
-async function changeAllPlayersState(state: number) {
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+export async function changeAllPlayersState(
+  state: number,
+  supabase: SupabaseClient
+) {
   const players = await supabase
     .from("match_participant_players")
     .select("id, match_participants(match_id)")
@@ -17,7 +22,11 @@ async function changeAllPlayersState(state: number) {
     );
 }
 
-async function changeStateByUsername(id: number, state: number) {
+export async function changeStateByUsername(
+  id: number,
+  state: number,
+  supabase: SupabaseClient
+) {
   const players = await supabase
     .from("match_participant_players")
     .select(
@@ -33,7 +42,7 @@ async function changeStateByUsername(id: number, state: number) {
 
   await supabase
     .from("match_participant_players")
-    .update({ state: 3 })
+    .update({ state: state })
     .in(
       "id",
       players.data.map((player) => player.id)
