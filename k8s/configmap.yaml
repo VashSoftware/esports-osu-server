@@ -1,0 +1,10 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: osu-server-config
+  namespace: default
+data:
+  SUPABASE_URL: https://mdixwlzweijevgjmcsmt.supabase.co
+  SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kaXh3bHp3ZWlqZXZnam1jc210Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2OTIwMzQyNDcsImV4cCI6MjAwNzYxMDI0N30.a8SWatAgGUn8MDCSVcjEdNhlEJum177aIVQnxVZaY8w
+  OSU_USERNAME: jollyWudchip
+  # OSU_CLIENT_ID=30152
