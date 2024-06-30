@@ -79,19 +79,19 @@ export async function createMatch(id: number, banchoClient: BanchoClient) {
   });
 
   channel.lobby.on("playing", () => {
-    matchStarted(supabase);
+    matchStarted(supabase, match.data.id);
   });
 
   channel.on("message", async (msg) => {
-    message(msg, channel, supabase);
+    message(msg, channel, supabase, match.data.id);
   });
 
   channel.lobby.on("playerJoined", async (user) => {
-    playerJoined(user, supabase);
+    playerJoined(user, supabase, match.data.id);
   });
 
   channel.lobby.on("playerLeft", async (user) => {
-    playerLeft(user, supabase);
+    playerLeft(user, supabase, match.data.id);
   });
 
   // Player moved
@@ -103,7 +103,7 @@ export async function createMatch(id: number, banchoClient: BanchoClient) {
   await supabase
     .from("matches")
     .update({ lobby_id: "#mp_" + channel.lobby.id })
-    .eq("id", process.env.MATCH_ID);
+    .eq("id", id);
 
   await channel.lobby.setSettings(2, 3, match.data.match_participants.length);
   console.log(
