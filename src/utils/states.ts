@@ -2,12 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export async function changeAllPlayersState(
   state: number,
+  matchId: number,
   supabase: SupabaseClient
 ) {
   const players = await supabase
     .from("match_participant_players")
     .select("id, match_participants(match_id)")
-    .eq("match_participants.match_id", process.env.MATCH_ID);
+    .eq("match_participants.match_id", matchId);
 
   if (players.error) {
     throw players.error;
@@ -25,6 +26,7 @@ export async function changeAllPlayersState(
 export async function changeStateByUsername(
   id: number,
   state: number,
+  matchId: number,
   supabase: SupabaseClient
 ) {
   const players = await supabase
@@ -34,7 +36,7 @@ export async function changeStateByUsername(
     )
     .eq("team_members.user_profiles.user_platforms.value", id)
     .eq("team_members.user_profiles.user_platforms.platform_id", 1)
-    .eq("match_participants.match_id", process.env.MATCH_ID);
+    .eq("match_participants.match_id", matchId);
 
   if (players.error) {
     throw players.error;

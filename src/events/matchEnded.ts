@@ -13,7 +13,7 @@ export async function matchEnded(
     const matchMaps = await supabase
       .from("match_maps")
       .select("scores(score, match_participant_players(match_participant_id))")
-      .eq("match_id", process.env.MATCH_ID);
+      .eq("match_id", match.data.id);
 
     if (matchMaps.error) {
       throw matchMaps.error;
@@ -75,7 +75,7 @@ export async function matchEnded(
 
     await channel.lobby.closeLobby();
 
-    await changeAllPlayersState(1, supabase);
+    await changeAllPlayersState(1, match.data.id, supabase);
 
     process.exit();
   }
@@ -83,12 +83,12 @@ export async function matchEnded(
   console.log("Match finished");
 
   for (const score of scores) {
-    await changeAllPlayersState(4, supabase);
+    await changeAllPlayersState(4, match.data.id, supabase);
 
     const matchMap = await supabase
       .from("match_maps")
       .select("id")
-      .eq("match_id", process.env.MATCH_ID)
+      .eq("match_id", match.data.id)
       .order("created_at", { ascending: false })
       .limit(1)
       .single();
@@ -122,7 +122,7 @@ export async function matchEnded(
       )
       .eq(
         "match_participant_players.match_participants.match_id",
-        process.env.MATCH_ID
+        match.data.id
       )
       .eq("match_map_id", matchMap.data.id);
 

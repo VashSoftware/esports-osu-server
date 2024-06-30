@@ -5,12 +5,13 @@ import type { BanchoMessage, BanchoMultiplayerChannel } from "bancho.js";
 export async function message(
   message: BanchoMessage,
   channel: BanchoMultiplayerChannel,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  matchId: number
 ) {
   if (message.message.startsWith("close")) {
     await channel.lobby.closeLobby();
 
-    await changeAllPlayersState(1, supabase);
+    await changeAllPlayersState(1, matchId, supabase);
 
     process.exit();
   }

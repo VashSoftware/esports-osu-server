@@ -4,9 +4,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export async function playerJoined(
   { player }: { player: BanchoLobbyPlayer },
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  matchId: number
 ) {
   console.log(`${player.user.username} joined the lobby`);
 
-  await changeStateByUsername(player.user.id, 3, supabase);
+  await changeStateByUsername(player.user.id, 3, matchId, supabase);
 }

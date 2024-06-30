@@ -3,6 +3,7 @@ import express from "express";
 import type { Request, Response } from "express";
 import { createMatch } from "./endpoints/createMatch.ts";
 import { sendMessages } from "./endpoints/sendMessages.ts";
+import { invitePlayer } from "./endpoints/invitePlayer.ts";
 
 console.log("Starting osu! server.");
 
@@ -24,10 +25,11 @@ app.post("/create-match", async (req: Request, res: Response) => {
 
   return res.json({ success: true });
 });
-app.post("/send-messages", async (req: Request, res: Response) => {
-  await sendMessages(req.body.messages, req.body.matchId);
-
-  return res.json({ success: true });
+app.post("/send-messages", async (req: Request, _res: Response) => {
+  await sendMessages(req.body.messages, req.body.channelId, banchoClient);
+});
+app.post("/invite-player", async (req: Request, _res: Response) => {
+  await invitePlayer(req.body.playerOsuId, req.body.channelId, banchoClient);
 });
 
 app.listen(port, () => {
