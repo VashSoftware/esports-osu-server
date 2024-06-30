@@ -20,8 +20,10 @@ const app = express();
 const port = 3000;
 app.use(express.json());
 
-app.post("/create-match", async (req: Request, _res: Response) => {
+app.post("/create-match", async (req: Request, res: Response) => {
   await createMatch(req.body.id, banchoClient);
+
+  return res.json({ success: true });
 });
 app.post("/send-messages", async (req: Request, _res: Response) => {
   await sendMessages(req.body.messages, req.body.channelId, banchoClient);
