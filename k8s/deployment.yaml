@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name:  osu-server-deployment
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: osu-server
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app:  osu-server
+    spec:
+      containers:
+      - name:  osu-server
+        image:  stanvash/osu-server:1.0
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+        # livenessProbe:
+        #   tcpSocket:
+        #     port: 80
+        #   initialDelaySeconds: 5
+        #   timeoutSeconds: 5
+        #   successThreshold: 1
+        #   failureThreshold: 3
+        #   periodSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /_status/healthz
+        #     port: 80
+        #   initialDelaySeconds: 5
+        #   timeoutSeconds: 2
+        #   successThreshold: 1
+        #   failureThreshold: 3
+        #   periodSeconds: 10
+        env:
+        - name: SUPABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: osu-server-config
+              key: SUPABASE_URL
+        - name: SUPABASE_ANON_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: osu-server-config
+              key: SUPABASE_ANON_KEY
+        - name: OSU_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: osu-server-config
+              key: OSU_USERNAME
+        - name: OSU_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: osu-server-secret
+              key: OSU_API_KEY
+        - name: OSU_IRC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: osu-server-secret
+              key: OSU_IRC_KEY
+        ports:
+        - containerPort:  3000
+          name:  osu-server
+      restartPolicy: Always
