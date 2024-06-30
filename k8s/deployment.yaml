@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name:  osu-server
-        image:  stanvash/osu-server:1.0
+        image:  europe-docker.pkg.dev/vash-esports/osu-server/osu-server
         imagePullPolicy: Always
         resources:
           requests:
