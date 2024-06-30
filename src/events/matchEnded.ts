@@ -1,10 +1,18 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { BanchoMultiplayerChannel } from "bancho.js";
 import type { Score } from "osu-api-extended/dist/types/v2/matches_detaIls";
+import { changeAllPlayersState } from "../utils/states";
 
-export async function matchEnded(scores: Score[]) {
+export async function matchEnded(
+  scores: Score[],
+  supabase: SupabaseClient,
+  channel: BanchoMultiplayerChannel,
+  match: any
+) {
   async function checkForMatchEnd() {
     const matchMaps = await supabase
       .from("match_maps")
-      .select("scores(match_participant_players(match_participant_id))")
+      .select("scores(score, match_participant_players(match_participant_id))")
       .eq("match_id", process.env.MATCH_ID);
 
     if (matchMaps.error) {
@@ -67,7 +75,7 @@ export async function matchEnded(scores: Score[]) {
 
     await channel.lobby.closeLobby();
 
-    await changeAllPlayersState(1);
+    await changeAllPlayersState(1, supabase);
 
     process.exit();
   }
@@ -75,7 +83,7 @@ export async function matchEnded(scores: Score[]) {
   console.log("Match finished");
 
   for (const score of scores) {
-    await changeAllPlayersState(4);
+    await changeAllPlayersState(4, supabase);
 
     const matchMap = await supabase
       .from("match_maps")

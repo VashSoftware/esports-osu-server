@@ -1,6 +1,14 @@
 import { BanchoClient } from "bancho.js";
 import { createClient } from "@supabase/supabase-js";
-import { setupEvents } from "../events/index.ts";
+import process from "node:process";
+import { matchEnded } from "../events/matchEnded.ts";
+import { matchStarted } from "../events/matchStarted.ts";
+import { message } from "../events/message.ts";
+import { playerJoined } from "../events/playerJoined.ts";
+import { playerLeft } from "../events/playerLeft.ts";
+import { playerMoved } from "../events/playerMoved.ts";
+import { playerReady } from "../events/playerReady.ts";
+import type { Score } from "osu-api-extended/dist/types/v2/matches_detaIls";
 
 export async function createMatch(id: number, banchoClient: BanchoClient) {
   const supabase = createClient(
@@ -61,7 +69,36 @@ export async function createMatch(id: number, banchoClient: BanchoClient) {
     true
   );
 
-  setupEvents(banchoClient);
+  channel.lobby.on("matchAborted", () => {
+    matchEnded([], supabase, channel, match);
+  });
+
+  //@ts-ignore
+  channel.lobby.on("matchFinished", (scores: Score[]) => {
+    matchEnded(scores, supabase, channel, match);
+  });
+
+  channel.lobby.on("playing", () => {
+    matchStarted(supabase);
+  });
+
+  channel.on("message", async (msg) => {
+    message(msg, channel, supabase);
+  });
+
+  channel.lobby.on("playerJoined", async (user) => {
+    playerJoined(user, supabase);
+  });
+
+  channel.lobby.on("playerLeft", async (user) => {
+    playerLeft(user, supabase);
+  });
+
+  // Player moved
+
+  channel.lobby.on("allPlayersReady", async () => {
+    playerReady(channel);
+  });
 
   await supabase
     .from("matches")

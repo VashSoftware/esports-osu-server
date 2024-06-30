@@ -1,7 +1,7 @@
-export async function playerReady() {
-  channel.lobby.on("allPlayersReady", async () => {
-    console.log("All players are ready");
+import type { BanchoMultiplayerChannel } from "bancho.js";
 
-    channel.lobby.startMatch();
-  });
+export async function playerReady(channel: BanchoMultiplayerChannel) {
+  console.log("All players are ready");
+
+  channel.lobby.startMatch();
 }
