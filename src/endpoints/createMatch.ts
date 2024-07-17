@@ -19,41 +19,72 @@ export async function createMatch(id: number, banchoClient: BanchoClient) {
   const match = await supabase
     .from("matches")
     .select(
-      `*, 
-      rounds (*, 
-        map_pools(*,
-          map_pool_mods(*,
-            map_pool_mod_mods(*,
-              mods(*
-              )
-            ),
-            map_pool_maps(*,
-              maps(*, 
-                mapsets(*
-                )
-              )
-            )
+      `
+      *,
+      rounds(
+        *,
+        events(
+          *,
+          event_groups(
+            *
           )
-        ),
-        events(*, event_groups(*))
+        )
       ),
-      match_participants(*,
-        match_participant_players(*,
-          match_participant_player_states(*
+      match_participants(
+        *,
+        match_participant_players(
+          *,
+          match_participant_player_states(
+            *
           ),
-          team_members(*, 
-            user_profiles(*,
+          team_members(
+            *,
+            user_profiles(
+              *,
               user_platforms(*)
             )
           )
         ),
-        participants(*, 
-          teams(*
+        participants(*,
+          teams(*, team_members(user_profiles(user_id)))
+        )
+      ),
+      match_maps(*,
+        map_pool_maps(*,
+          maps(*,
+            mapsets(*)
+          )
+        ),
+        scores(*,
+          match_participant_players(*)
+        )
+      ),
+      match_bans(*,
+        match_participants(*,
+          participants(*,
+            teams(name)
           )
         )
       ),
-      match_maps(*, map_pool_maps(*, maps(*, mapsets(*))), scores(*, match_participant_players(*))),
-      match_bans(*, match_participants(*, participants(*, teams(name))))`
+      map_pools(
+        *,          
+        map_pool_maps(
+          *,
+          maps(
+            *,
+            mapsets(
+              *
+            )
+          ),
+          map_pool_map_mods(
+            *,
+            mods(
+              *
+            )
+          )
+        )
+      )
+      `
     )
     .eq("id", id)
     .single();

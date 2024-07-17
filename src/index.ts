@@ -25,11 +25,15 @@ app.post("/create-match", async (req: Request, res: Response) => {
 
   return res.json({ success: true });
 });
-app.post("/send-messages", async (req: Request, _res: Response) => {
+app.post("/send-messages", async (req: Request, res: Response) => {
   await sendMessages(req.body.messages, req.body.channelId, banchoClient);
+
+  return res.json({ success: true });
 });
-app.post("/invite-player", async (req: Request, _res: Response) => {
+app.post("/invite-player", async (req: Request, res: Response) => {
   await invitePlayer(req.body.playerOsuId, req.body.channelId, banchoClient);
+
+  return res.json({ success: true });
 });
 
 app.listen(port, () => {

@@ -65,6 +65,11 @@ export async function matchEnded(
   }
 
   async function handleMatchWin(matchParticipantPlayerIndex: number) {
+    await supabase
+      .from("matches")
+      .update({ ongoing: false })
+      .eq("id", match.data.id);
+
     const matchParticipantPlayer =
       match.data.match_participants[matchParticipantPlayerIndex]
         .match_participant_players[0];
