@@ -4,6 +4,7 @@ import type { Request, Response } from "express";
 import { createMatch } from "./endpoints/createMatch.ts";
 import { sendMessages } from "./endpoints/sendMessages.ts";
 import { invitePlayer } from "./endpoints/invitePlayer.ts";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 console.log("Starting osu! server.");
 
@@ -16,15 +17,70 @@ await banchoClient.connect();
 
 console.log("Connected to Bancho");
 
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_ANON_KEY!
+);
+
+function canMakeMatch(
+  match_id: any,
+  banchoClient: BanchoClient,
+  supabase: SupabaseClient<any, "public", any>
+) {
+  const matches = supabase.from("matches").select("*").eq("ongoing", true);
+
+  if (matches.data?.length > 3) {
+    return false;
+  }
+
+  return true;
+}
+
+supabase
+  .channel("schema-db-changes")
+  .on(
+    "postgres_changes",
+    { event: "*", schema: "public", table: "match_queue" },
+    (payload) => {
+      if (payload.new?.positiion !== 1) {
+        return;
+      }
+
+      if (!canMakeMatch(payload.new?.match_id, banchoClient, supabase)) {
+        return;
+      }
+
+      createMatch(payload.new?.match_id, banchoClient, supabase);
+    }
+  )
+  .subscribe();
+
+// Polling function to check for matches
+async function pollMatches() {
+  console.log("Polling for matches...");
+  const { data, error } = await supabase
+    .from("match_queue")
+    .select("*")
+    .eq("position", 1)
+    .maybeSingle();
+
+  if (!data) {
+    return;
+  }
+
+  if (!canMakeMatch(data.match_id, banchoClient, supabase)) {
+    return;
+  }
+
+  createMatch(data.match_id, banchoClient, supabase);
+}
+
+setInterval(pollMatches, 5000);
+
 const app = express();
 const port = 3000;
 app.use(express.json());
 
-app.post("/create-match", async (req: Request, res: Response) => {
-  await createMatch(req.body.id, banchoClient);
-
-  return res.json({ success: true });
-});
 app.post("/send-messages", async (req: Request, res: Response) => {
   await sendMessages(req.body.messages, req.body.channelId, banchoClient);
 
