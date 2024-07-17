@@ -54,8 +54,8 @@ spec:
               key: SUPABASE_URL
         - name: SUPABASE_ANON_KEY
           valueFrom:
-            configMapKeyRef:
-              name: osu-server-config
+            secretKeyRef:
+              name: osu-server-secret
               key: SUPABASE_ANON_KEY
         - name: OSU_USERNAME
           valueFrom:
