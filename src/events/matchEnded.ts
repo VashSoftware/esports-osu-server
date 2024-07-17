@@ -82,7 +82,17 @@ export async function matchEnded(
 
     await changeAllPlayersState(1, match.data.id, supabase);
 
-    process.exit();
+    const matchQueue = await supabase
+      .from("match_queue")
+      .select("id, position")
+      .gt("position", 0);
+
+    for (const match of matchQueue.data) {
+      await supabase
+        .from("match_queue")
+        .update({ position: match.position - 1 })
+        .eq("id", match.id);
+    }
   }
 
   console.log("Match finished");
