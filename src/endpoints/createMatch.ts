@@ -53,7 +53,7 @@ export async function createMatch(
             *,
             user_profiles(
               *,
-              user_platforms(*)
+              user_platforms(*, platforms(name))
             )
           )
         ),
@@ -167,7 +167,7 @@ export async function createMatch(
       await channel.lobby.invitePlayer(
         String(
           player.team_members.user_profiles.user_platforms.filter(
-            (pf: any) => pf.platform_id == 10
+            (pf: any) => pf.platforms.name == "osu! (username)"
           )[0].value
         )
       );

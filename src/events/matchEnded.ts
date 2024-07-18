@@ -132,8 +132,8 @@ export async function matchEnded(
         score.user_id
       )
       .eq(
-        "match_participant_players.team_members.user_profiles.user_platforms.platform_id",
-        1
+        "match_participant_players.team_members.user_profiles.user_platforms.platforms.name",
+        'osu!'
       )
       .eq(
         "match_participant_players.match_participants.match_id",
