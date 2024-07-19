@@ -32,10 +32,10 @@ export async function changeStateByUsername(
   const players = await supabase
     .from("match_participant_players")
     .select(
-      "id, team_members(user_profiles(user_platforms(platform_id, value))), match_participants!inner(match_id)"
+      "id, team_members(user_profiles(user_platforms(platforms(name), value))), match_participants!inner(match_id)"
     )
     .eq("team_members.user_profiles.user_platforms.value", id)
-    .eq("team_members.user_profiles.user_platforms.platform_id", 1)
+    .eq("team_members.user_profiles.user_platforms.platforms.name", "osu!")
     .eq("match_participants.match_id", matchId);
 
   if (players.error) {
