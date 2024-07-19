@@ -286,7 +286,7 @@ export async function checkScores(
             )
           ,team_members(
             user_profiles(
-              user_platforms(value, platform_id))))`
+              user_platforms(value, platforms(name)))))`
       )
       .eq(
         "match_participant_players.team_members.user_profiles.user_platforms.value",
@@ -345,12 +345,10 @@ export async function createMatch(
 
   const match = await getMatch(supabase, id);
 
-  setInterval(() => checkMatchParticipants(match, supabase, channel), 3000);
-
-  let channel = await getOrMakeChannel(supabase, banchoClient, match);
-
   setInterval(() => checkLobbyExists(), 10000);
 
+  let channel = await getOrMakeChannel(supabase, banchoClient, match);
+  setInterval(() => checkMatchParticipants(match, supabase, channel), 3000);
   setInterval(() => checkScores(channel, supabase, match), 5000);
 
   channel.lobby.on("matchAborted", () => {
