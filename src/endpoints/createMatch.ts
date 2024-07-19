@@ -8,11 +8,7 @@ import { playerLeft } from "../events/playerLeft.ts";
 import { playerReady } from "../events/playerReady.ts";
 import type { Score } from "osu-api-extended/dist/types/v2/matches_detaIls";
 
-export async function createMatch(
-  id: number,
-  banchoClient: BanchoClient,
-  supabase: SupabaseClient
-) {
+async function clearMatchQueue(id: number, supabase: SupabaseClient) {
   const matchQueue = await supabase
     .from("match_queue")
     .select("*")
@@ -27,6 +23,16 @@ export async function createMatch(
     .from("match_queue")
     .update({ position: null })
     .eq("match_id", id);
+}
+
+export async function createMatch(
+  id: number,
+  banchoClient: BanchoClient,
+  supabase: SupabaseClient
+) {
+  console.log("Creating match: ", id);
+
+  await clearMatchQueue(id, supabase);
 
   const match = await supabase
     .from("matches")
@@ -181,15 +187,66 @@ export async function createMatch(
 
   let channel: BanchoMultiplayerChannel;
 
-  try {
-    channel = await banchoClient.createLobby(
-      `${"VASH"}: (${
-        match.data.match_participants[0].participants.teams.name
-      }) vs (${match.data.match_participants[1].participants.teams.name})`,
-      true
-    );
-  } catch (e) {
-    console.log(e);
+  if (match.data.lobby_id) {
+    try {
+      channel = banchoClient.getChannel(
+        match.data.lobby_id
+      ) as BanchoMultiplayerChannel;
+      await channel.join();
+    } catch (e) {
+      console.log(e);
+    }
+  } else {
+    try {
+      channel = await banchoClient.createLobby(
+        `${"VASH"}: (${
+          match.data.match_participants[0].participants.teams.name
+        }) vs (${match.data.match_participants[1].participants.teams.name})`,
+        true
+      );
+
+      await supabase
+        .from("matches")
+        .update({ lobby_id: "#mp_" + channel.lobby.id })
+        .eq("id", id);
+
+      await channel.lobby.setSettings(
+        2,
+        3,
+        match.data.match_participants.length
+      );
+
+      console.log(
+        "Set lobby settings: ",
+        2,
+        3,
+        match.data.match_participants.length
+      );
+
+      match.data.match_participants.forEach((matchParticipant: any) => {
+        matchParticipant.match_participant_players.forEach(
+          async (player: any) => {
+            await channel.lobby.invitePlayer(
+              String(
+                player.team_members.user_profiles.user_platforms.filter(
+                  (pf: any) => pf.platforms.name == "osu! (username)"
+                )[0].value
+              )
+            );
+
+            console.log(
+              "Invited player: ",
+              player.team_members.user_profiles.name
+            );
+          }
+        );
+      });
+
+      await channel.lobby.addRef("Stan");
+      console.log("Added ref: ", "Stan");
+    } catch (e) {
+      console.log(e);
+    }
   }
 
   channel.lobby.on("matchAborted", () => {
@@ -222,34 +279,4 @@ export async function createMatch(
   channel.lobby.on("allPlayersReady", async () => {
     playerReady(channel);
   });
-
-  await supabase
-    .from("matches")
-    .update({ lobby_id: "#mp_" + channel.lobby.id })
-    .eq("id", id);
-
-  await channel.lobby.setSettings(2, 3, match.data.match_participants.length);
-  console.log(
-    "Set lobby settings: ",
-    2,
-    3,
-    match.data.match_participants.length
-  );
-
-  match.data.match_participants.forEach((matchParticipant: any) => {
-    matchParticipant.match_participant_players.forEach(async (player: any) => {
-      await channel.lobby.invitePlayer(
-        String(
-          player.team_members.user_profiles.user_platforms.filter(
-            (pf: any) => pf.platforms.name == "osu! (username)"
-          )[0].value
-        )
-      );
-
-      console.log("Invited player: ", player.team_members.user_profiles.name);
-    });
-  });
-
-  await channel.lobby.addRef("Stan");
-  console.log("Added ref: ", "Stan");
 }
