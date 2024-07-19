@@ -22,12 +22,24 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY!
 );
 
-function canMakeMatch(
+const ongoingMatches = await supabase
+  .from("matches")
+  .select("*")
+  .eq("ongoing", true);
+
+for (const match of ongoingMatches.data) {
+  createMatch(match.id, banchoClient, supabase);
+}
+
+async function canMakeMatch(
   match_id: any,
   banchoClient: BanchoClient,
   supabase: SupabaseClient<any, "public", any>
 ) {
-  const matches = supabase.from("matches").select("*").eq("ongoing", true);
+  const matches = await supabase
+    .from("matches")
+    .select("*")
+    .eq("ongoing", true);
 
   if (matches.data?.length > 3) {
     return false;
@@ -41,12 +53,14 @@ supabase
   .on(
     "postgres_changes",
     { event: "*", schema: "public", table: "match_queue" },
-    (payload) => {
+    async (payload) => {
       if (payload.new?.positiion !== 1) {
         return;
       }
 
-      if (!canMakeMatch(payload.new?.match_id, banchoClient, supabase)) {
+      if (
+        !(await canMakeMatch(payload.new?.match_id, banchoClient, supabase))
+      ) {
         return;
       }
 
