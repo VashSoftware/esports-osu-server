@@ -42,13 +42,11 @@ async function handleMatchWin(
   await updateMatchQueue(supabase);
 }
 
-export async function matchEnded(
+export async function checkMatchWin(
   supabase: SupabaseClient,
   channel: BanchoMultiplayerChannel,
   match: any
 ) {
-  await changeAllPlayersState(4, match.data.id, supabase);
-
   const matchMaps = await supabase
     .from("match_maps")
     .select(
@@ -96,6 +94,8 @@ export async function matchEnded(
         )
         .reduce((sum, score) => sum + score.score, 0)
   ).length;
+
+  console.log(pointsTeam1, pointsTeam2);
 
   if (pointsTeam1 > match.data.rounds.best_of / 2) {
     await handleMatchWin(0, supabase, channel, match);

@@ -4,11 +4,12 @@ import {
   BanchoMultiplayerChannel,
 } from "bancho.js";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { matchEnded } from "../events/matchEnded.ts";
+import { checkMatchWin, matchEnded } from "../events/matchEnded.ts";
 import { matchStarted } from "../events/matchStarted.ts";
 import { message } from "../events/message.ts";
 import { playerReady } from "../events/playerReady.ts";
 import type { Score } from "osu-api-extended/dist/types/v2/matches_detaIls";
+import { changeAllPlayersState } from "../utils/states.ts";
 
 async function getMatch(supabase: SupabaseClient, id: number) {
   const match = await supabase
@@ -317,6 +318,8 @@ export async function checkScores(
     }
   }
 
+  await checkMatchWin(supabase, channel, match);
+
   console.log("Finished updating scores for match map:", matchMaps.data[0].id);
 }
 
@@ -371,11 +374,11 @@ export async function createMatch(
   setInterval(() => checkSettings(channel, supabase, match), 10000);
 
   channel.lobby.on("matchAborted", () => {
-    matchEnded(supabase, channel, match);
+    changeAllPlayersState(4, match.data.id, supabase);
   });
 
   channel.lobby.on("matchFinished", () => {
-    matchEnded(supabase, channel, match);
+    changeAllPlayersState(4, match.data.id, supabase);
   });
 
   channel.lobby.on("playing", () => {
