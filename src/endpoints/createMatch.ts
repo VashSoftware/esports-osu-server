@@ -259,7 +259,7 @@ export async function checkScores(
     return;
   }
 
-  if (matchMaps.data[0].status == "waiting") {
+  if (matchMaps.data[0].status == "waiting" || channel.lobby.playing) {
     console.log("Match map is still waiting for players to ready up");
     return;
   }
@@ -318,6 +318,11 @@ export async function checkScores(
     }
   }
 
+  await supabase
+    .from("match_maps")
+    .update({ status: "finished" })
+    .eq("id", matchMaps.data[0].id);
+
   await checkMatchWin(supabase, channel, match);
 
   console.log("Finished updating scores for match map:", matchMaps.data[0].id);
@@ -373,11 +378,11 @@ export async function createMatch(
   setInterval(() => checkScores(channel, supabase, match), 5000);
   setInterval(() => checkSettings(channel, supabase, match), 10000);
 
-  channel.lobby.on("matchAborted", () => {
+  channel.lobby.on("matchAborted", async () => {
     changeAllPlayersState(4, match.data.id, supabase);
   });
 
-  channel.lobby.on("matchFinished", () => {
+  channel.lobby.on("matchFinished", async () => {
     changeAllPlayersState(4, match.data.id, supabase);
   });
 

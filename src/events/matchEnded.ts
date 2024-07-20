@@ -104,11 +104,4 @@ export async function checkMatchWin(
   if (pointsTeam2 > match.data.rounds.best_of / 2) {
     await handleMatchWin(1, supabase, channel, match);
   }
-
-  await supabase
-    .from("match_maps")
-    .update({ status: "finished" })
-    .eq("id", matchMaps.data[matchMaps.data.length - 1].id);
-
-  console.log("Match finished");
 }
