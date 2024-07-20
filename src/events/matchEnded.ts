@@ -51,7 +51,9 @@ export async function matchEnded(
 
   const matchMaps = await supabase
     .from("match_maps")
-    .select("scores(score, match_participant_players(match_participant_id))")
+    .select(
+      "id, scores(score, match_participant_players(match_participant_id))"
+    )
     .eq("match_id", match.data.id);
 
   if (matchMaps.error) {
@@ -101,6 +103,11 @@ export async function matchEnded(
   if (pointsTeam2 > match.data.rounds.best_of / 2) {
     await handleMatchWin(1, supabase, channel, match);
   }
+
+  await supabase
+    .from("match_maps")
+    .update({ status: "finished" })
+    .eq("id", matchMaps.data[matchMaps.data.length - 1].id);
 
   console.log("Match finished");
 }

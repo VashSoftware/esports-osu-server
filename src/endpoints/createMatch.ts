@@ -133,46 +133,40 @@ async function checkMatchParticipants(
 
       const lobbyPlayer = await channel.lobby.getPlayerById(osuId);
 
-      await channel.lobby.changeTeam(
-        lobbyPlayer,
-        index % 2 === 0 ? BanchoLobbyTeams.Red : BanchoLobbyTeams.Blue
-      );
-      await channel.lobby.movePlayer(lobbyPlayer, 0);
+      // await channel.lobby.changeTeam(
+      //   lobbyPlayer,
+      //   index % 2 === 0 ? BanchoLobbyTeams.Red : BanchoLobbyTeams.Blue
+      // );
+      // await channel.lobby.movePlayer(lobbyPlayer, 0);
 
       if (
         channel.lobby.slots.some((slot) => {
           return slot?.user.id == osuId;
         })
       ) {
-        if (matchParticipantPlayerState.data!.state !== 3) {
-          await supabase
-            .from("match_participant_players")
-            .update({ state: 3 })
-            .eq("id", matchParticipantPlayer.id);
+        await supabase
+          .from("match_participant_players")
+          .update({ state: 3 })
+          .eq("id", matchParticipantPlayer.id);
 
-          console.log("Player is in the lobby:", osuId);
-        }
+        console.log("Player is in the lobby:", osuId);
       } else {
         try {
           const whois = await lobbyPlayer.user.whois();
 
-          if (matchParticipantPlayerState.data!.state !== 2) {
-            await supabase
-              .from("match_participant_players")
-              .update({ state: 2 })
-              .eq("id", matchParticipantPlayer.id);
+          await supabase
+            .from("match_participant_players")
+            .update({ state: 2 })
+            .eq("id", matchParticipantPlayer.id);
 
-            console.log("Player is not in the lobby:", osuId);
-          }
+          console.log("Player is not in the lobby:", osuId);
         } catch (e) {
-          if (matchParticipantPlayerState.data!.state !== 1) {
-            await supabase
-              .from("match_participant_players")
-              .update({ state: 1 })
-              .eq("id", matchParticipantPlayer.id);
+          await supabase
+            .from("match_participant_players")
+            .update({ state: 1 })
+            .eq("id", matchParticipantPlayer.id);
 
-            console.log("Player is not in the lobby:", osuId);
-          }
+          console.log("Player is not in the lobby:", osuId);
         }
       }
     }
@@ -192,65 +186,53 @@ async function getOrMakeChannel(
         match.data.lobby_id
       ) as BanchoMultiplayerChannel;
       await channel.join();
-    } catch (e) {
-      console.log(e);
-    }
-  } else {
-    try {
-      channel = await banchoClient.createLobby(
-        `${"VASH"}: (${
-          match.data.match_participants[0].participants.teams.name
-        }) vs (${match.data.match_participants[1].participants.teams.name})`,
-        true
-      );
-
-      await supabase
-        .from("matches")
-        .update({ lobby_id: "#mp_" + channel.lobby.id })
-        .eq("id", match.data.id);
-
-      await channel.lobby.setSettings(
-        2,
-        3,
-        match.data.match_participants.length
-      );
-
-      await channel.lobby.lockSlots();
-
-      console.log(
-        "Set lobby settings: ",
-        2,
-        3,
-        match.data.match_participants.length
-      );
-
-      match.data.match_participants.forEach((matchParticipant: any) => {
-        matchParticipant.match_participant_players.forEach(
-          async (player: any) => {
-            await channel.lobby.invitePlayer(
-              String(
-                player.team_members.user_profiles.user_platforms.filter(
-                  (pf: any) => pf.platforms.name == "osu! (username)"
-                )[0].value
-              )
-            );
-
-            console.log(
-              "Invited player: ",
-              player.team_members.user_profiles.name
-            );
-          }
-        );
-      });
-
-      await channel.lobby.addRef("Stan");
-      console.log("Added ref: ", "Stan");
+      return channel;
     } catch (e) {
       console.log(e);
     }
   }
 
-  return channel!;
+  channel = await banchoClient.createLobby(
+    `${"VASH"}: (${
+      match.data.match_participants[0].participants.teams.name
+    }) vs (${match.data.match_participants[1].participants.teams.name})`,
+    true
+  );
+
+  await supabase
+    .from("matches")
+    .update({ lobby_id: "#mp_" + channel.lobby.id })
+    .eq("id", match.data.id);
+
+  await channel.lobby.setSettings(2, 3, match.data.match_participants.length);
+
+  await channel.lobby.lockSlots();
+
+  console.log(
+    "Set lobby settings: ",
+    2,
+    3,
+    match.data.match_participants.length
+  );
+
+  match.data.match_participants.forEach((matchParticipant: any) => {
+    matchParticipant.match_participant_players.forEach(async (player: any) => {
+      await channel.lobby.invitePlayer(
+        String(
+          player.team_members.user_profiles.user_platforms.filter(
+            (pf: any) => pf.platforms.name == "osu! (username)"
+          )[0].value
+        )
+      );
+
+      console.log("Invited player: ", player.team_members.user_profiles.name);
+    });
+  });
+
+  await channel.lobby.addRef("Stan");
+  console.log("Added ref: ", "Stan");
+
+  return channel;
 }
 
 export async function checkScores(
@@ -260,78 +242,82 @@ export async function checkScores(
 ) {
   const scores = channel.lobby.scores;
 
-  const matchMap = await supabase
+  const matchMaps = await supabase
     .from("match_maps")
-    .select("id")
+    .select("id, status")
     .eq("match_id", match.data.id)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
+    .limit(2);
 
-  if (matchMap.error) {
-    throw matchMap.error;
+  if (matchMaps.error) {
+    throw matchMaps.error;
+  }
+
+  if (matchMaps.data.length === 0) {
+    console.log("No match maps found for match:", match.data.id);
+    return;
+  }
+
+  if (matchMaps.data[0].status == "waiting") {
+    console.log("Match map is still waiting for players to ready up");
+    return;
   }
 
   for (const score of scores) {
-    const scores = await supabase
+    const playerId = score.player.user.id;
+
+    // Fetch the latest score entry for the current map and player
+    const vashScores = await supabase
       .from("scores")
       .select(
         `id,
-          match_map_id,
-          match_participant_players!inner(
-            match_participants!inner(
-              match_id, participants(
-                team_id
-              )
+        score,
+        match_map_id,
+        match_participant_players!inner(
+          match_participants!inner(
+            match_id, participants(
+              team_id
             )
-          ,team_members(
-            user_profiles(
-              user_platforms(value, platforms(name)))))`
+          )
+        ,team_members(
+          user_profiles(
+            user_platforms(value, platforms(name)))))`
       )
       .eq(
         "match_participant_players.team_members.user_profiles.user_platforms.value",
-        score.player.user.id
+        playerId
       )
       .eq(
         "match_participant_players.team_members.user_profiles.user_platforms.platforms.name",
         "osu!"
       )
-      .eq(
-        "match_participant_players.match_participants.match_id",
-        match.data.id
-      )
-      .eq("match_map_id", matchMap.data.id);
+      .eq("match_map_id", matchMaps.data[0].id)
+      .order("created_at", { ascending: false });
 
-    if (scores.error) {
-      throw scores.error;
+    if (vashScores.error) {
+      throw vashScores.error;
     }
 
-    if (scores.data.length > 1) {
-      console.log("Adding extra point to Stan 2.");
+    if (vashScores.data.length === 0) {
+      console.log(
+        "No score entry found for player:",
+        playerId,
+        "for map:",
+        matchMaps.data[0].id
+      );
+      continue;
+    }
 
-      await supabase
-        .from("scores")
-        .update({ score: score.score + 1, failed: !score.pass })
-        .eq("id", scores.data[0].id);
-
+    // Update the latest score entry if it exists and the score is different
+    if (vashScores.data[0].score != score.score) {
       await supabase
         .from("scores")
         .update({ score: score.score, failed: !score.pass })
-        .eq("id", scores.data[1].id);
-    } else {
-      await supabase
-        .from("scores")
-        .update({ score: score.score, failed: !score.pass })
-        .in(
-          "id",
-          scores.data.map((score) => score.id)
-        );
+        .eq("id", vashScores.data[0].id);
     }
   }
-}
 
-async function checkLobbyExists() {
-  return true;
+  console.log("Finished updating scores for match map:", matchMaps.data[0].id);
 }
 
 export async function createMatch(
@@ -345,9 +331,11 @@ export async function createMatch(
 
   const match = await getMatch(supabase, id);
 
-  setInterval(() => checkLobbyExists(), 10000);
-
   let channel = await getOrMakeChannel(supabase, banchoClient, match);
+  // if (!channel) {
+  //   return console.error("Failed to create or join channel");
+  // }
+
   setInterval(() => checkMatchParticipants(match, supabase, channel), 3000);
   setInterval(() => checkScores(channel, supabase, match), 5000);
 
