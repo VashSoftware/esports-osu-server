@@ -54,7 +54,8 @@ export async function matchEnded(
     .select(
       "id, scores(score, match_participant_players(match_participant_id))"
     )
-    .eq("match_id", match.data.id);
+    .eq("match_id", match.data.id)
+    .order("created_at", { ascending: true });
 
   if (matchMaps.error) {
     throw matchMaps.error;

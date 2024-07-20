@@ -344,7 +344,7 @@ export async function checkSettings(
 
   await channel.lobby.setMap(matchMap.data.map_pool_maps.maps.osu_id);
   await channel.lobby.setMods(
-    "NF" + matchMap.data.map_pool_maps.map_pool_map_mods[0].mods.code,
+    "NF " + matchMap.data.map_pool_maps.map_pool_map_mods[0].mods.code,
     matchMap.data.map_pool_maps.map_pool_map_mods[0].mods.code == "FM"
   );
   console.log("Checked settings");
