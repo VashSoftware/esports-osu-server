@@ -320,6 +320,36 @@ export async function checkScores(
   console.log("Finished updating scores for match map:", matchMaps.data[0].id);
 }
 
+export async function checkSettings(
+  channel: BanchoMultiplayerChannel,
+  supabase: SupabaseClient,
+  match: any
+) {
+  const matchMap = await supabase
+    .from("match_maps")
+    .select("id, map_pool_maps(maps(osu_id), map_pool_map_mods(mods(code)))")
+    .eq("match_id", match.data.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!matchMap.data) {
+    console.log("No match map found for match:", match.data.id);
+    return;
+  }
+
+  if (matchMap.data.map_pool_maps.maps.osu_id == channel.lobby.beatmapId) {
+    return;
+  }
+
+  await channel.lobby.setMap(matchMap.data.map_pool_maps.maps.osu_id);
+  await channel.lobby.setMods(
+    matchMap.data.map_pool_maps.map_pool_map_mods[0].mods.code,
+    matchMap.data.map_pool_maps.map_pool_map_mods[0].mods.code == "FM"
+  );
+  console.log("Checked settings");
+}
+
 export async function createMatch(
   id: number,
   banchoClient: BanchoClient,
@@ -338,13 +368,13 @@ export async function createMatch(
 
   setInterval(() => checkMatchParticipants(match, supabase, channel), 3000);
   setInterval(() => checkScores(channel, supabase, match), 5000);
+  setInterval(() => checkSettings(channel, supabase, match), 10000);
 
   channel.lobby.on("matchAborted", () => {
     matchEnded(supabase, channel, match);
   });
 
-  //@ts-ignore
-  channel.lobby.on("matchFinished", (scores: Score[]) => {
+  channel.lobby.on("matchFinished", () => {
     matchEnded(supabase, channel, match);
   });
 
@@ -355,8 +385,6 @@ export async function createMatch(
   channel.on("message", async (msg) => {
     message(msg, channel, supabase, match.data.id);
   });
-
-  // Player moved
 
   channel.lobby.on("allPlayersReady", async () => {
     playerReady(channel);
