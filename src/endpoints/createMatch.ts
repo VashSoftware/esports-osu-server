@@ -264,58 +264,49 @@ export async function checkScores(
     return;
   }
 
-  for (const score of scores) {
-    const playerId = score.player.user.id;
+  const vashScores = await supabase
+    .from("scores")
+    .select(
+      `id,
+    score,
+    match_map_id,
+    match_participant_players!inner(
+      match_participants!inner(
+        match_id, participants(
+          team_id
+        )
+      )
+    ,team_members(
+      user_profiles(
+        user_platforms(value, platforms(name)))))`
+    )
+    .eq("match_map_id", matchMaps.data[0].id)
+    .order("created_at", { ascending: false });
+
+  for (const vashScore of vashScores.data!) {
+    const osuScore = scores.filter(
+      (score) =>
+        score.player.user.id ==
+        vashScore.match_participant_players.team_members.user_profiles.user_platforms.filter(
+          (up) => up.platforms.name == "osu!"
+        )[0].value
+    )[0];
 
     // Fetch the latest score entry for the current map and player
-    const vashScores = await supabase
-      .from("scores")
-      .select(
-        `id,
-        score,
-        match_map_id,
-        match_participant_players!inner(
-          match_participants!inner(
-            match_id, participants(
-              team_id
-            )
-          )
-        ,team_members(
-          user_profiles(
-            user_platforms(value, platforms(name)))))`
-      )
-      .eq(
-        "match_participant_players.team_members.user_profiles.user_platforms.value",
-        playerId
-      )
-      .eq(
-        "match_participant_players.team_members.user_profiles.user_platforms.platforms.name",
-        "osu!"
-      )
-      .eq("match_map_id", matchMaps.data[0].id)
-      .order("created_at", { ascending: false });
 
     if (vashScores.error) {
       throw vashScores.error;
     }
 
-    if (vashScores.data.length === 0) {
-      console.log(
-        "No score entry found for player:",
-        playerId,
-        "for map:",
-        matchMaps.data[0].id
-      );
+    if (!osuScore) {
+      console.log("Player not found in the lobby");
       continue;
     }
 
-    // Update the latest score entry if it exists and the score is different
-    if (vashScores.data[0].score != score.score) {
-      await supabase
-        .from("scores")
-        .update({ score: score.score, failed: !score.pass })
-        .eq("id", vashScores.data[0].id);
-    }
+    await supabase
+      .from("scores")
+      .update({ score: osuScore.score, failed: !osuScore.pass })
+      .eq("id", vashScores.data[0].id);
   }
 
   await supabase
