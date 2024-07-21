@@ -244,6 +244,8 @@ export async function checkScores(
     return;
   }
 
+  const matchMapId = matchMaps.data[0].id;
+
   const vashScores = await supabase
     .from("scores")
     .select(
@@ -260,44 +262,51 @@ export async function checkScores(
         user_profiles(
           user_platforms(value, platforms(name)))))`
     )
-    .eq("match_map_id", matchMaps.data[0].id)
+    .eq("match_map_id", matchMapId)
     .order("created_at", { ascending: false });
 
-  for (const vashScore of vashScores.data!) {
-    const osuScore = scores.filter(
-      (score) =>
-        score.player.user.id ==
-        // @ts-ignore
-        vashScore.match_participant_players.team_members.user_profiles.user_platforms.filter(
-          (up: any) => up.platforms.name == "osu!"
-        )[0].value
-    )[0];
+  if (vashScores.error) {
+    throw vashScores.error;
+  }
 
-    // Fetch the latest score entry for the current map and player
+  for (const vashScore of vashScores.data) {
+    const osuPlatform =
+      vashScore.match_participant_players.team_members.user_profiles.user_platforms.find(
+        (up: any) => up.platforms.name === "osu!"
+      );
 
-    if (vashScores.error) {
-      throw vashScores.error;
-    }
-
-    if (!osuScore) {
-      console.log("Player not found in the lobby");
+    if (!osuPlatform) {
+      console.log(`No osu! platform found for player: ${vashScore.id}`);
       continue;
     }
+
+    const osuPlayerId = osuPlatform.value;
+    const osuScore = scores.find(
+      (score) => score.player.user.id === parseInt(osuPlayerId, 10)
+    );
+
+    console.log(`Checking player: ${osuPlayerId}`);
+    if (!osuScore) {
+      console.log(`Player with osu! ID ${osuPlayerId} not found in the lobby`);
+      continue;
+    }
+
+    console.log(`Updating score for player ID ${osuPlayerId}:`, osuScore.score);
 
     await supabase
       .from("scores")
       .update({ score: osuScore.score, failed: !osuScore.pass })
-      .eq("id", vashScores.data[0].id);
+      .eq("id", vashScore.id);
   }
 
   await supabase
     .from("match_maps")
     .update({ status: "finished" })
-    .eq("id", matchMaps.data[0].id);
+    .eq("id", matchMapId);
 
   await checkMatchWin(supabase, channel, match);
 
-  console.log("Finished updating scores for match map:", matchMaps.data[0].id);
+  console.log("Finished updating scores for match map:", matchMapId);
 }
 
 export async function checkSettings(
