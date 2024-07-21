@@ -1,5 +1,9 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { BanchoClient, BanchoMultiplayerChannel } from "bancho.js";
+import {
+  BanchoClient,
+  BanchoLobbyPlayerScore,
+  BanchoMultiplayerChannel,
+} from "bancho.js";
 import { checkMatchWin } from "../events/matchEnded.ts";
 import { matchStarted } from "../events/matchStarted.ts";
 import { message } from "../events/message.ts";
@@ -221,7 +225,7 @@ export async function checkScores(
   supabase: SupabaseClient,
   match: any
 ) {
-  const scores = channel.lobby.scores;
+  const lobbyScores: BanchoLobbyPlayerScore[] = channel.lobby.scores;
 
   const matchMaps = await supabase
     .from("match_maps")
@@ -249,49 +253,37 @@ export async function checkScores(
   const vashScores = await supabase
     .from("scores")
     .select(
-      `id,
-      score,
-      match_map_id,
-      match_participant_players!inner(
-        match_participants!inner(
-          match_id, participants(
-            team_id
-          )
-        )
-      ,team_members(
-        user_profiles(
-          user_platforms(value, platforms(name)))))`
+      `*, match_participant_players!inner(team_members(user_profiles(user_platforms(*, platforms(name)))))`
     )
     .eq("match_map_id", matchMapId)
     .order("created_at", { ascending: false });
 
-  if (vashScores.error) {
-    throw vashScores.error;
-  }
+  for (const vashScore of vashScores.data!) {
+    const player =
+      vashScore.match_participant_players.team_members.user_profiles;
 
-  for (const vashScore of vashScores.data) {
-    const osuPlatform =
-      vashScore.match_participant_players.team_members.user_profiles.user_platforms.find(
-        (up: any) => up.platforms.name === "osu!"
-      );
+    // Find the osu! username instead of ID
+    const osuUsername = player.user_platforms.find(
+      (up: any) => up.platforms.name === "osu! (username)" // Filter by username
+    )?.value;
 
-    if (!osuPlatform) {
-      console.log(`No osu! platform found for player: ${vashScore.id}`);
+    if (!osuUsername) {
+      console.log(`No osu! username found for player: ${player.id}`);
       continue;
     }
 
-    const osuPlayerId = osuPlatform.value;
-    const osuScore = scores.find(
-      (score) => score.player.user.id === parseInt(osuPlayerId, 10)
+    const osuScore = lobbyScores.find(
+      (score) => score.player.user.username === osuUsername // Compare usernames
     );
 
-    console.log(`Checking player: ${osuPlayerId}`);
     if (!osuScore) {
-      console.log(`Player with osu! ID ${osuPlayerId} not found in the lobby`);
+      console.log(
+        `Player with osu! username ${osuUsername} not found in the lobby`
+      );
       continue;
     }
 
-    console.log(`Updating score for player ID ${osuPlayerId}:`, osuScore.score);
+    console.log(`Updating score for player ID ${osuUsername}:`, osuScore.score);
 
     await supabase
       .from("scores")
