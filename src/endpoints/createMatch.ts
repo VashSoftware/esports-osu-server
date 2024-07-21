@@ -314,6 +314,8 @@ export async function checkSettings(
   supabase: SupabaseClient,
   match: any
 ) {
+  await channel.lobby.updateSettings();
+
   const matchMap = await supabase
     .from("match_maps")
     .select("id, map_pool_maps(maps(osu_id), map_pool_map_mods(mods(code)))")
@@ -380,6 +382,6 @@ export async function createMatch(
   });
 
   channel.lobby.on("allPlayersReady", async () => {
-    playerReady(channel);
+    playerReady(channel, supabase, match);
   });
 }
