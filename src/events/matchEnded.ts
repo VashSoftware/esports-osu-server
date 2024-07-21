@@ -16,8 +16,9 @@ async function updateMatchQueue(supabase: SupabaseClient) {
   }
 }
 
-import { sleep } from "some-sleep-package"; // Ensure to install a sleep package or use a custom sleep function
-
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 async function handleMatchWin(
   matchParticipantPlayerIndex: number,
   supabase: SupabaseClient,
