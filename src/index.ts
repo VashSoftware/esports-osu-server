@@ -27,7 +27,7 @@ const ongoingMatches = await supabase
   .select("*")
   .eq("ongoing", true);
 
-for (const match of ongoingMatches.data) {
+for (const match of ongoingMatches.data!) {
   createMatch(match.id, banchoClient, supabase);
 }
 
@@ -41,7 +41,7 @@ async function canMakeMatch(
     .select("*")
     .eq("ongoing", true);
 
-  if (matches.data?.length > 3) {
+  if (matches.data!.length > 3) {
     return false;
   }
 
@@ -54,16 +54,19 @@ supabase
     "postgres_changes",
     { event: "*", schema: "public", table: "match_queue" },
     async (payload) => {
-      if (payload.new?.positiion !== 1) {
+      // @ts-ignore
+      if (payload.new?.position !== 1) {
         return;
       }
 
       if (
+        // @ts-ignore
         !(await canMakeMatch(payload.new?.match_id, banchoClient, supabase))
       ) {
         return;
       }
 
+      // @ts-ignore
       createMatch(payload.new?.match_id, banchoClient, supabase);
     }
   )

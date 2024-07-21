@@ -1,14 +1,9 @@
-import {
-  BanchoClient,
-  BanchoLobbyTeams,
-  BanchoMultiplayerChannel,
-} from "bancho.js";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { checkMatchWin, matchEnded } from "../events/matchEnded.ts";
+import { BanchoClient, BanchoMultiplayerChannel } from "bancho.js";
+import { checkMatchWin } from "../events/matchEnded.ts";
 import { matchStarted } from "../events/matchStarted.ts";
 import { message } from "../events/message.ts";
 import { playerReady } from "../events/playerReady.ts";
-import type { Score } from "osu-api-extended/dist/types/v2/matches_detaIls";
 import { changeAllPlayersState } from "../utils/states.ts";
 
 async function getMatch(supabase: SupabaseClient, id: number) {
@@ -114,17 +109,8 @@ async function checkMatchParticipants(
   supabase: SupabaseClient,
   channel: BanchoMultiplayerChannel
 ) {
-  for (const [
-    index,
-    matchParticipant,
-  ] of match.data.match_participants.entries()) {
+  for (const matchParticipant of match.data.match_participants) {
     for (const matchParticipantPlayer of matchParticipant.match_participant_players) {
-      const matchParticipantPlayerState = await supabase
-        .from("match_participant_players")
-        .select("state")
-        .eq("id", matchParticipantPlayer.id)
-        .single();
-
       const osuId =
         matchParticipantPlayer.team_members.user_profiles.user_platforms.find(
           (pf: any) => pf.platforms.name === "osu!"
@@ -133,12 +119,6 @@ async function checkMatchParticipants(
       console.log("Checking player: ", osuId);
 
       const lobbyPlayer = await channel.lobby.getPlayerById(osuId);
-
-      // await channel.lobby.changeTeam(
-      //   lobbyPlayer,
-      //   index % 2 === 0 ? BanchoLobbyTeams.Red : BanchoLobbyTeams.Blue
-      // );
-      // await channel.lobby.movePlayer(lobbyPlayer, 0);
 
       if (
         channel.lobby.slots.some((slot) => {
@@ -268,17 +248,17 @@ export async function checkScores(
     .from("scores")
     .select(
       `id,
-    score,
-    match_map_id,
-    match_participant_players!inner(
-      match_participants!inner(
-        match_id, participants(
-          team_id
+      score,
+      match_map_id,
+      match_participant_players!inner(
+        match_participants!inner(
+          match_id, participants(
+            team_id
+          )
         )
-      )
-    ,team_members(
-      user_profiles(
-        user_platforms(value, platforms(name)))))`
+      ,team_members(
+        user_profiles(
+          user_platforms(value, platforms(name)))))`
     )
     .eq("match_map_id", matchMaps.data[0].id)
     .order("created_at", { ascending: false });
@@ -287,8 +267,9 @@ export async function checkScores(
     const osuScore = scores.filter(
       (score) =>
         score.player.user.id ==
+        // @ts-ignore
         vashScore.match_participant_players.team_members.user_profiles.user_platforms.filter(
-          (up) => up.platforms.name == "osu!"
+          (up: any) => up.platforms.name == "osu!"
         )[0].value
     )[0];
 
@@ -337,13 +318,17 @@ export async function checkSettings(
     return;
   }
 
+  // @ts-ignore
   if (matchMap.data.map_pool_maps.maps.osu_id == channel.lobby.beatmapId) {
     return;
   }
 
+  // @ts-ignore
   await channel.lobby.setMap(matchMap.data.map_pool_maps.maps.osu_id);
   await channel.lobby.setMods(
+    // @ts-ignore
     "NF " + matchMap.data.map_pool_maps.map_pool_map_mods[0].mods.code,
+    // @ts-ignore
     matchMap.data.map_pool_maps.map_pool_map_mods[0].mods.code == "FM"
   );
   console.log("Checked settings");
