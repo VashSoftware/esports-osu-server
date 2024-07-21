@@ -8,7 +8,7 @@ async function updateMatchQueue(supabase: SupabaseClient) {
     .select("id, position")
     .gt("position", 0);
 
-  for (const match of matchQueue.data) {
+  for (const match of matchQueue.data!) {
     await supabase
       .from("match_queue")
       .update({ position: match.position - 1 })
@@ -64,6 +64,7 @@ export async function checkMatchWin(
       match_map.scores
         .filter(
           (score) =>
+            // @ts-ignore
             score.match_participant_players.match_participant_id ==
             match.data.match_participants[0].id
         )
@@ -71,6 +72,7 @@ export async function checkMatchWin(
       match_map.scores
         .filter(
           (score) =>
+            // @ts-ignore
             score.match_participant_players.match_participant_id ==
             match.data.match_participants[1].id
         )
@@ -82,6 +84,7 @@ export async function checkMatchWin(
       match_map.scores
         .filter(
           (score) =>
+            // @ts-ignore
             score.match_participant_players.match_participant_id ==
             match.data.match_participants[1].id
         )
@@ -89,6 +92,7 @@ export async function checkMatchWin(
       match_map.scores
         .filter(
           (score) =>
+            // @ts-ignore
             score.match_participant_players.match_participant_id ==
             match.data.match_participants[0].id
         )
