@@ -16,6 +16,8 @@ async function updateMatchQueue(supabase: SupabaseClient) {
   }
 }
 
+import { sleep } from "some-sleep-package"; // Ensure to install a sleep package or use a custom sleep function
+
 async function handleMatchWin(
   matchParticipantPlayerIndex: number,
   supabase: SupabaseClient,
@@ -31,9 +33,13 @@ async function handleMatchWin(
     match.data.match_participants[matchParticipantPlayerIndex]
       .match_participant_players[0];
 
+  const winnerName = matchParticipantPlayer.team_members.user_profiles.name;
   await channel.sendMessage(
-    `The match has been won by ${matchParticipantPlayer.team_members.user_profiles.name}`
+    `The match has been won by ${winnerName}. The lobby will close in 60 seconds.`
   );
+
+  // Wait for 60 seconds
+  await sleep(60000);
 
   await channel.lobby.closeLobby();
 
