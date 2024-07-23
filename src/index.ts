@@ -148,17 +148,17 @@ async function pollQuickQueue() {
       averageTeamRatingDifferences.push({
         team1,
         team2,
-        star_rating_difference: Math.abs((team1Ratings + team2Ratings) / 2),
+        average_rating: Math.abs((team1Ratings + team2Ratings) / 2),
       });
     }
   }
 
   const sortedTeamMatchups = averageTeamRatingDifferences.sort(
-    (a, b) => a.star_rating_difference - b.star_rating_difference
+    (a, b) => a.average_rating - b.average_rating
   );
 
   const mapPoolIdReq = await supabase.rpc("get_closest_map_pool_id", {
-    average_star_rating: sortedTeamMatchups[0].star_rating_difference,
+    average_star_rating: sortedTeamMatchups[0].average_rating,
   });
 
   console.log("Map pool ID:", mapPoolIdReq);
