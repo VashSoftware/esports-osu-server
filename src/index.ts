@@ -157,11 +157,16 @@ async function pollQuickQueue() {
     (a, b) => a.average_rating - b.average_rating
   );
 
-  const mapPoolIdReq = await supabase.rpc("get_closest_map_pool_id", {
+  console.log(
+    "Average team members SR: ",
+    sortedTeamMatchups[0].average_rating
+  );
+
+  const mapPoolIdReq = await supabase.rpc("get_closest_map_pool", {
     average_star_rating: sortedTeamMatchups[0].average_rating,
   });
 
-  console.log("Map pool ID:", mapPoolIdReq);
+  console.log("Picked map pool ID:", mapPoolIdReq.data);
 
   if (mapPoolIdReq.error || !mapPoolIdReq.data) {
     console.error("Error fetching map pool ID:", mapPoolIdReq.error);
