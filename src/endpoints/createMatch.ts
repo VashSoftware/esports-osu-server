@@ -342,6 +342,24 @@ export async function checkSettings(
   console.log("Checked settings");
 }
 
+async function checkOngoingStatus(
+  supabase: SupabaseClient,
+  matchId: number
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("matches")
+    .select("ongoing")
+    .eq("id", matchId)
+    .single();
+
+  if (error) {
+    console.error("Error checking match status:", error);
+    return false;
+  }
+
+  return data.ongoing;
+}
+
 export async function createMatch(
   id: number,
   banchoClient: BanchoClient,
@@ -355,9 +373,46 @@ export async function createMatch(
 
   let channel = (await getOrMakeChannel(supabase, banchoClient, match))!;
 
-  setInterval(() => checkMatchParticipants(match, supabase, channel), 3000);
-  setInterval(() => checkScores(channel, supabase, match), 5000);
-  setInterval(() => checkSettings(channel, supabase, match), 10000);
+  const matchIntervals = {
+    participants: setInterval(async () => {
+      if (await checkOngoingStatus(supabase, match.data.id)) {
+        checkMatchParticipants(match, supabase, channel);
+      } else {
+        clearInterval(matchIntervals.participants);
+        clearInterval(matchIntervals.scores);
+        clearInterval(matchIntervals.settings);
+        console.log(
+          `Match ${match.data.id} is no longer ongoing, stopped all processes.`
+        );
+      }
+    }, 3000),
+
+    scores: setInterval(async () => {
+      if (await checkOngoingStatus(supabase, match.data.id)) {
+        checkScores(channel, supabase, match);
+      } else {
+        clearInterval(matchIntervals.participants);
+        clearInterval(matchIntervals.scores);
+        clearInterval(matchIntervals.settings);
+        console.log(
+          `Match ${match.data.id} is no longer ongoing, stopped all processes.`
+        );
+      }
+    }, 5000),
+
+    settings: setInterval(async () => {
+      if (await checkOngoingStatus(supabase, match.data.id)) {
+        checkSettings(channel, supabase, match);
+      } else {
+        clearInterval(matchIntervals.participants);
+        clearInterval(matchIntervals.scores);
+        clearInterval(matchIntervals.settings);
+        console.log(
+          `Match ${match.data.id} is no longer ongoing, stopped all processes.`
+        );
+      }
+    }, 10000),
+  };
 
   channel.lobby.on("matchAborted", async () => {
     changeAllPlayersState(4, match.data.id, supabase);
