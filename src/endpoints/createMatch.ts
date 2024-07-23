@@ -353,10 +353,7 @@ export async function createMatch(
 
   const match = await getMatch(supabase, id);
 
-  let channel = await getOrMakeChannel(supabase, banchoClient, match);
-  // if (!channel) {
-  //   return console.error("Failed to create or join channel");
-  // }
+  let channel = (await getOrMakeChannel(supabase, banchoClient, match))!;
 
   setInterval(() => checkMatchParticipants(match, supabase, channel), 3000);
   setInterval(() => checkScores(channel, supabase, match), 5000);
