@@ -177,12 +177,17 @@ async function getOrMakeChannel(
     }
   }
 
-  channel = await banchoClient.createLobby(
-    `${"VASH"}: (${
-      match.data.match_participants[0].participants.teams.name
-    }) vs (${match.data.match_participants[1].participants.teams.name})`,
-    true
-  );
+  try {
+    channel = await banchoClient.createLobby(
+      `${"VASH"}: (${
+        match.data.match_participants[0].participants.teams.name
+      }) vs (${match.data.match_participants[1].participants.teams.name})`,
+      true
+    );
+  } catch (e) {
+    console.log(e);
+    return;
+  }
 
   await supabase
     .from("matches")
