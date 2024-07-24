@@ -8,11 +8,11 @@ export async function message(
   supabase: SupabaseClient,
   matchId: number
 ) {
-  if (message.message.startsWith("close")) {
+  if (message.message.startsWith("close") && message.user.username == "Stan") {
     await channel.lobby.closeLobby();
 
     await changeAllPlayersState(1, matchId, supabase);
 
-    process.exit();
+    await supabase.from("matches").update({ ongoing: false }).eq("id", matchId);
   }
 }

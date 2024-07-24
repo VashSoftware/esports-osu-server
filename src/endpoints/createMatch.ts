@@ -1,14 +1,11 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import {
   BanchoClient,
-  BanchoLobbyPlayerScore,
   BanchoLobbyPlayerStates,
   BanchoMultiplayerChannel,
 } from "bancho.js";
 import { checkMatchWin } from "../events/matchEnded.ts";
-import { matchStarted } from "../events/matchStarted.ts";
 import { message } from "../events/message.ts";
-import { playerReady } from "../events/playerReady.ts";
 import { changeAllPlayersState } from "../utils/states.ts";
 
 async function getMatch(supabase: SupabaseClient, id: number) {
@@ -184,7 +181,7 @@ export async function checkScores(
   supabase: SupabaseClient,
   match: any
 ) {
-  const lobbyScores: BanchoLobbyPlayerScore[] = channel.lobby.scores;
+  const lobbyScores = channel.lobby.scores;
 
   const matchMaps = await supabase
     .from("match_maps")
@@ -202,8 +199,8 @@ export async function checkScores(
     return;
   }
 
-  if (matchMaps.data[0].status == "waiting" || channel.lobby.playing) {
-    console.log("Match map is still waiting for players to ready up");
+  if (matchMaps.data[0].status != "finished") {
+    console.log("Match map isn't finished yet.");
     return;
   }
 
@@ -221,9 +218,8 @@ export async function checkScores(
     const player =
       vashScore.match_participant_players.team_members.user_profiles;
 
-    // Find the osu! username instead of ID
     const osuUsername = player.user_platforms.find(
-      (up: any) => up.platforms.name === "osu! (username)" // Filter by username
+      (up: any) => up.platforms.name === "osu! (username)"
     )?.value;
 
     if (!osuUsername) {
@@ -265,11 +261,13 @@ export async function checkSettings(
   supabase: SupabaseClient,
   match: any
 ) {
-  await channel.lobby.updateSettings();
+  console.log("Checking settings");
 
   const matchMap = await supabase
     .from("match_maps")
-    .select("id, map_pool_maps(maps(osu_id), map_pool_map_mods(mods(code)))")
+    .select(
+      "id, map_pool_maps(maps(osu_id), map_pool_map_mods(mods(code))), status"
+    )
     .eq("match_id", match.data.id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -281,7 +279,24 @@ export async function checkSettings(
   }
 
   if (channel.lobby.playing) {
-    await matchStarted(supabase, match.data.id);
+    if (matchMap.data.status != "playing") {
+      await changeAllPlayersState(5, match.data.id, supabase);
+
+      const matchMaps = await supabase
+        .from("match_maps")
+        .select(
+          "id, scores(score, match_participant_players(match_participant_id))"
+        )
+        .eq("match_id", match.data.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      await supabase
+        .from("match_maps")
+        .update({ status: "playing" })
+        .eq("id", matchMaps.data?.id);
+    }
     return;
   }
 
@@ -298,8 +313,6 @@ export async function checkSettings(
     // @ts-ignore
     matchMap.data.map_pool_maps.map_pool_map_mods[0].mods.code == "FM"
   );
-
-  console.log("Checked settings");
 }
 
 export async function checkReady(
@@ -327,9 +340,9 @@ export async function checkReady(
     return;
   }
 
-  await playerReady(channel, supabase, match);
+  await channel.lobby.startMatch();
 
-  console.log("Checked settings");
+  console.log("Checked ready state and started the match");
 }
 
 async function checkOngoingStatus(
@@ -365,6 +378,7 @@ export async function createMatch(
 
   const interval = setInterval(async () => {
     if (await checkOngoingStatus(supabase, match.data.id)) {
+      await channel.lobby.updateSettings();
       await checkMatchParticipants(match, supabase, channel);
       await checkScores(channel, supabase, match);
       await checkSettings(channel, supabase, match);
