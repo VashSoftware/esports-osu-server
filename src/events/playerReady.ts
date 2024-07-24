@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BanchoMultiplayerChannel } from "bancho.js";
+import { matchStarted } from "./matchStarted";
 
 export async function playerReady(
   channel: BanchoMultiplayerChannel,
@@ -29,4 +30,5 @@ export async function playerReady(
   }
 
   channel.lobby.startMatch();
+  await matchStarted(supabase, match.data.id);
 }
