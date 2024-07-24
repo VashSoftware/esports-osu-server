@@ -14,74 +14,25 @@ import { changeAllPlayersState } from "../utils/states.ts";
 async function getMatch(supabase: SupabaseClient, id: number) {
   const match = await supabase
     .from("matches")
-    .select(
-      `
+    .select(`
       *,
-      rounds(
-        *,
-        events(
-          *,
-          event_groups(
-            *
-          )
-        )
-      ),
+      rounds(*, events(*, event_groups(*))),
       match_participants(
         *,
         match_participant_players(
           *,
-          match_participant_player_states(
-            *
-          ),
+          match_participant_player_states(*),
           team_members(
             *,
-            user_profiles(
-              *,
-              user_platforms(*, platforms(name))
-            )
+            user_profiles(*, user_platforms(*, platforms(name)))
           )
         ),
-        participants(*,
-          teams(*, team_members(user_profiles(user_id)))
-        )
+        participants(*, teams(*, team_members(user_profiles(user_id))))
       ),
-      match_maps(*,
-        map_pool_maps(*,
-          maps(*,
-            mapsets(*)
-          )
-        ),
-        scores(*,
-          match_participant_players(*)
-        )
-      ),
-      match_bans(*,
-        match_participants(*,
-          participants(*,
-            teams(name)
-          )
-        )
-      ),
-      map_pools(
-        *,          
-        map_pool_maps(
-          *,
-          maps(
-            *,
-            mapsets(
-              *
-            )
-          ),
-          map_pool_map_mods(
-            *,
-            mods(
-              *
-            )
-          )
-        )
-      )
-      `
-    )
+      match_maps(*, map_pool_maps(*, maps(*, mapsets(*))), scores(*, match_participant_players(*))),
+      match_bans(*, match_participants(*, participants(*, teams(name)))),
+      map_pools(*, map_pool_maps(*, maps(*, mapsets(*)), map_pool_map_mods(*, mods(*))))
+    `)
     .eq("id", id)
     .single();
 
@@ -138,7 +89,7 @@ async function checkMatchParticipants(
         console.log("Player is in the lobby:", osuId);
       } else {
         try {
-          const whois = await lobbyPlayer.user.whois();
+          await lobbyPlayer.user.whois();
 
           await supabase
             .from("match_participant_players")
@@ -402,46 +353,18 @@ export async function createMatch(
 
   let channel = (await getOrMakeChannel(supabase, banchoClient, match))!;
 
-  const matchIntervals = {
-    participants: setInterval(async () => {
-      if (await checkOngoingStatus(supabase, match.data.id)) {
-        checkMatchParticipants(match, supabase, channel);
-      } else {
-        clearInterval(matchIntervals.participants);
-        clearInterval(matchIntervals.scores);
-        clearInterval(matchIntervals.settings);
-        console.log(
-          `Match ${match.data.id} is no longer ongoing, stopped all processes.`
-        );
-      }
-    }, 3000),
-
-    scores: setInterval(async () => {
-      if (await checkOngoingStatus(supabase, match.data.id)) {
-        checkScores(channel, supabase, match);
-      } else {
-        clearInterval(matchIntervals.participants);
-        clearInterval(matchIntervals.scores);
-        clearInterval(matchIntervals.settings);
-        console.log(
-          `Match ${match.data.id} is no longer ongoing, stopped all processes.`
-        );
-      }
-    }, 5000),
-
-    settings: setInterval(async () => {
-      if (await checkOngoingStatus(supabase, match.data.id)) {
-        checkSettings(channel, supabase, match);
-      } else {
-        clearInterval(matchIntervals.participants);
-        clearInterval(matchIntervals.scores);
-        clearInterval(matchIntervals.settings);
-        console.log(
-          `Match ${match.data.id} is no longer ongoing, stopped all processes.`
-        );
-      }
-    }, 10000),
-  };
+  const interval = setInterval(async () => {
+    if (await checkOngoingStatus(supabase, match.data.id)) {
+      await checkMatchParticipants(match, supabase, channel);
+      await checkScores(channel, supabase, match);
+      await checkSettings(channel, supabase, match);
+    } else {
+      clearInterval(interval);
+      console.log(
+        `Match ${match.data.id} is no longer ongoing, stopped all processes.`
+      );
+    }
+  }, 5000);
 
   channel.lobby.on("matchAborted", async () => {
     changeAllPlayersState(4, match.data.id, supabase);
