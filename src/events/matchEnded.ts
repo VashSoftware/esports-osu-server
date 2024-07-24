@@ -34,15 +34,15 @@ async function handleMatchWin(
     `The match has been won by ${winnerName}. The lobby will close in 60 seconds.`
   );
 
-  // Wait for 60 seconds
-  await sleep(60000);
-
-  await channel.lobby.closeLobby();
-
   await supabase
     .from("matches")
     .update({ ongoing: false })
     .eq("id", match.data.id);
+
+  // Wait for 60 seconds
+  await sleep(60000);
+
+  await channel.lobby.closeLobby();
 
   await updateMatchQueue(supabase);
 }
