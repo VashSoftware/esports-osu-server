@@ -14,7 +14,8 @@ import { changeAllPlayersState } from "../utils/states.ts";
 async function getMatch(supabase: SupabaseClient, id: number) {
   const match = await supabase
     .from("matches")
-    .select(`
+    .select(
+      `
       *,
       rounds(*, events(*, event_groups(*))),
       match_participants(
@@ -32,7 +33,8 @@ async function getMatch(supabase: SupabaseClient, id: number) {
       match_maps(*, map_pool_maps(*, maps(*, mapsets(*))), scores(*, match_participant_players(*))),
       match_bans(*, match_participants(*, participants(*, teams(name)))),
       map_pools(*, map_pool_maps(*, maps(*, mapsets(*)), map_pool_map_mods(*, mods(*))))
-    `)
+    `
+    )
     .eq("id", id)
     .single();
 
@@ -297,6 +299,14 @@ export async function checkSettings(
     matchMap.data.map_pool_maps.map_pool_map_mods[0].mods.code == "FM"
   );
 
+  console.log("Checked settings");
+}
+
+export async function checkReady(
+  channel: BanchoMultiplayerChannel,
+  supabase: SupabaseClient,
+  match: any
+) {
   const lobbyPlayers = channel.lobby.slots.filter((slot) => slot?.user);
 
   if (
@@ -311,7 +321,7 @@ export async function checkSettings(
   }
 
   if (
-    lobbyPlayers.some((slot) => slot?.state != BanchoLobbyPlayerStates.Ready)
+    lobbyPlayers.some((slot) => slot.state !== BanchoLobbyPlayerStates.Ready)
   ) {
     console.log("Not all players are ready");
     return;
@@ -358,6 +368,7 @@ export async function createMatch(
       await checkMatchParticipants(match, supabase, channel);
       await checkScores(channel, supabase, match);
       await checkSettings(channel, supabase, match);
+      await checkReady(channel, supabase, match);
     } else {
       clearInterval(interval);
       console.log(
