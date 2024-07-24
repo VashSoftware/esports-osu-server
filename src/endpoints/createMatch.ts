@@ -2,6 +2,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import {
   BanchoClient,
   BanchoLobbyPlayerScore,
+  BanchoLobbyPlayerStates,
   BanchoMultiplayerChannel,
 } from "bancho.js";
 import { checkMatchWin } from "../events/matchEnded.ts";
@@ -326,6 +327,11 @@ export async function checkSettings(
     return;
   }
 
+  if (channel.lobby.playing) {
+    await matchStarted(supabase, match.data.id);
+    return;
+  }
+
   // @ts-ignore
   if (matchMap.data.map_pool_maps.maps.osu_id == channel.lobby.beatmapId) {
     return;
@@ -339,6 +345,29 @@ export async function checkSettings(
     // @ts-ignore
     matchMap.data.map_pool_maps.map_pool_map_mods[0].mods.code == "FM"
   );
+
+  const lobbyPlayers = channel.lobby.slots.filter((slot) => slot?.user);
+
+  if (
+    lobbyPlayers.length <
+    match.data.match_participants.reduce(
+      (acc: number, mp: any) => acc + mp.match_participant_players.length,
+      0
+    )
+  ) {
+    console.log("Not enough players in the lobby");
+    return;
+  }
+
+  if (
+    lobbyPlayers.some((slot) => slot?.state != BanchoLobbyPlayerStates.Ready)
+  ) {
+    console.log("Not all players are ready");
+    return;
+  }
+
+  await playerReady(channel, supabase, match);
+
   console.log("Checked settings");
 }
 
@@ -422,15 +451,7 @@ export async function createMatch(
     changeAllPlayersState(4, match.data.id, supabase);
   });
 
-  channel.lobby.on("playing", () => {
-    matchStarted(supabase, match.data.id);
-  });
-
   channel.on("message", async (msg) => {
     message(msg, channel, supabase, match.data.id);
-  });
-
-  channel.lobby.on("allPlayersReady", async () => {
-    playerReady(channel, supabase, match);
   });
 }
