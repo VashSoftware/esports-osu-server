@@ -6,7 +6,7 @@ import {
 } from "bancho.js";
 import { checkMatchWin } from "../events/matchEnded.ts";
 import { message } from "../events/message.ts";
-import { changeAllPlayersState } from "../utils/states.ts";
+import { changeAllPlayersState, changeStateById } from "../utils/states.ts";
 
 async function getMatch(supabase: SupabaseClient, id: number) {
   const match = await supabase
@@ -278,25 +278,25 @@ export async function checkSettings(
     return;
   }
 
-  if (channel.lobby.playing) {
-    if (matchMap.data.status != "playing") {
-      await changeAllPlayersState(5, match.data.id, supabase);
+  if (channel.lobby.playing && matchMap.data.status == "waiting") {
+    await changeAllPlayersState(5, match.data.id, supabase);
 
-      const matchMaps = await supabase
-        .from("match_maps")
-        .select(
-          "id, scores(score, match_participant_players(match_participant_id))"
-        )
-        .eq("match_id", match.data.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+    await supabase
+      .from("match_maps")
+      .update({ status: "playing" })
+      .eq("id", matchMap.data?.id);
 
-      await supabase
-        .from("match_maps")
-        .update({ status: "playing" })
-        .eq("id", matchMaps.data?.id);
-    }
+    return;
+  }
+
+  if (!channel.lobby.playing && matchMap.data.status == "playing") {
+    await changeAllPlayersState(3, match.data.id, supabase);
+
+    await supabase
+      .from("match_maps")
+      .update({ status: "finished" })
+      .eq("id", matchMap.data?.id);
+
     return;
   }
 
@@ -321,6 +321,12 @@ export async function checkReady(
   match: any
 ) {
   const lobbyPlayers = channel.lobby.slots.filter((slot) => slot?.user);
+
+  for (const lobbyPlayer of lobbyPlayers) {
+    if (lobbyPlayer.state === BanchoLobbyPlayerStates.Ready) {
+      await changeStateById(lobbyPlayer.user.id, 4, match.data.id, supabase);
+    }
+  }
 
   if (
     lobbyPlayers.length <
@@ -390,14 +396,6 @@ export async function createMatch(
       );
     }
   }, 5000);
-
-  channel.lobby.on("matchAborted", async () => {
-    changeAllPlayersState(4, match.data.id, supabase);
-  });
-
-  channel.lobby.on("matchFinished", async () => {
-    changeAllPlayersState(4, match.data.id, supabase);
-  });
 
   channel.on("message", async (msg) => {
     message(msg, channel, supabase, match.data.id);

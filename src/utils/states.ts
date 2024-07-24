@@ -23,7 +23,7 @@ export async function changeAllPlayersState(
     );
 }
 
-export async function changeStateByUsername(
+export async function changeStateById(
   id: number,
   state: number,
   matchId: number,

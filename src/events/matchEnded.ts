@@ -25,11 +25,6 @@ async function handleMatchWin(
   channel: BanchoMultiplayerChannel,
   match: any
 ) {
-  await supabase
-    .from("matches")
-    .update({ ongoing: false })
-    .eq("id", match.data.id);
-
   const matchParticipantPlayer =
     match.data.match_participants[matchParticipantPlayerIndex]
       .match_participant_players[0];
@@ -44,7 +39,10 @@ async function handleMatchWin(
 
   await channel.lobby.closeLobby();
 
-  await changeAllPlayersState(1, match.data.id, supabase);
+  await supabase
+    .from("matches")
+    .update({ ongoing: false })
+    .eq("id", match.data.id);
 
   await updateMatchQueue(supabase);
 }
