@@ -5,6 +5,7 @@ import { createMatch } from "./endpoints/createMatch.ts";
 import { sendMessages } from "./endpoints/sendMessages.ts";
 import { invitePlayer } from "./endpoints/invitePlayer.ts";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { io } from "socket.io-client";
 
 console.log("Starting osu! server.");
 
@@ -17,6 +18,11 @@ await banchoClient.connect();
 
 console.log("Connected to Bancho");
 
+const socket = io(process.env.REALTIME_SERVER_DOMAIN!);
+socket.on("connect", () => {
+  console.log("Connected to Realtime Server");
+});
+
 const supabase: SupabaseClient = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_ANON_KEY!
@@ -28,7 +34,7 @@ const ongoingMatches = await supabase
   .eq("ongoing", true);
 
 for (const match of ongoingMatches.data!) {
-  createMatch(match.id, banchoClient, supabase);
+  createMatch(match.id, banchoClient, supabase, socket);
 }
 
 async function canMakeMatch(supabase: SupabaseClient) {
@@ -60,11 +66,12 @@ async function pollMatches() {
     return;
   }
 
-  createMatch(data.match_id, banchoClient, supabase);
+  createMatch(data.match_id, banchoClient, supabase, socket);
+
+  socket.emit("match_queue_update", {});
 }
 
-pollMatches();
-setInterval(pollMatches, 5000);
+setInterval(pollMatches, 10000);
 
 async function pollQuickQueue() {
   console.log("Polling for solo queue...");
@@ -264,6 +271,8 @@ async function pollQuickQueue() {
     match_id: match[0].id,
     position: matchQueue.data!.length + 1,
   });
+
+  socket.emit("match_queue_update", {});
 }
 
 pollQuickQueue();

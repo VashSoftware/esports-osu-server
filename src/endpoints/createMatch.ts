@@ -7,6 +7,8 @@ import {
 import { checkMatchWin } from "../events/matchEnded.ts";
 import { message } from "../events/message.ts";
 import { changeAllPlayersState, changeStateById } from "../utils/states.ts";
+import type { Socket } from "socket.io-client";
+import type { PostgrestResponseSuccess } from "@supabase/postgrest-js";
 
 async function getMatch(supabase: SupabaseClient, id: number) {
   const match = await supabase
@@ -27,7 +29,7 @@ async function getMatch(supabase: SupabaseClient, id: number) {
         ),
         participants(*, teams(*, team_members(user_profiles(user_id))))
       ),
-      match_maps(*, map_pool_maps(*, maps(*, mapsets(*))), scores(*, match_participant_players(*))),
+      match_maps(*, map_pool_maps(*, map_pool_map_mods(*, mods(*)), maps(*, mapsets(*))), scores(*, match_participant_players(*))),
       match_bans(*, match_participants(*, participants(*, teams(name)))),
       map_pools(*, map_pool_maps(*, maps(*, mapsets(*)), map_pool_map_mods(*, mods(*))))
     `
@@ -40,73 +42,6 @@ async function getMatch(supabase: SupabaseClient, id: number) {
   }
 
   return match;
-}
-
-async function clearMatchQueue(id: number, supabase: SupabaseClient) {
-  const matchQueue = await supabase
-    .from("match_queue")
-    .select("*")
-    .eq("match_id", id)
-    .maybeSingle();
-
-  if (matchQueue.data?.position !== 1) {
-    return;
-  }
-
-  await supabase
-    .from("match_queue")
-    .update({ position: null })
-    .eq("match_id", id);
-}
-
-async function checkMatchParticipants(
-  match: any,
-  supabase: SupabaseClient,
-  channel: BanchoMultiplayerChannel
-) {
-  for (const matchParticipant of match.data.match_participants) {
-    for (const matchParticipantPlayer of matchParticipant.match_participant_players) {
-      const osuId =
-        matchParticipantPlayer.team_members.user_profiles.user_platforms.find(
-          (pf: any) => pf.platforms.name === "osu!"
-        )?.value;
-
-      console.log("Checking player: ", osuId);
-
-      const lobbyPlayer = await channel.lobby.getPlayerById(osuId);
-
-      if (
-        channel.lobby.slots.some((slot) => {
-          return slot?.user.id == osuId;
-        })
-      ) {
-        await supabase
-          .from("match_participant_players")
-          .update({ state: 3 })
-          .eq("id", matchParticipantPlayer.id);
-
-        console.log("Player is in the lobby:", osuId);
-      } else {
-        try {
-          await lobbyPlayer.user.whois();
-
-          await supabase
-            .from("match_participant_players")
-            .update({ state: 2 })
-            .eq("id", matchParticipantPlayer.id);
-
-          console.log("Player is not in the lobby:", osuId);
-        } catch (e) {
-          await supabase
-            .from("match_participant_players")
-            .update({ state: 1 })
-            .eq("id", matchParticipantPlayer.id);
-
-          console.log("Player is not in the lobby:", osuId);
-        }
-      }
-    }
-  }
 }
 
 async function getOrMakeChannel(
@@ -179,32 +114,29 @@ async function getOrMakeChannel(
 export async function checkScores(
   channel: BanchoMultiplayerChannel,
   supabase: SupabaseClient,
-  match: any
+  match: any,
+  socket: Socket
 ) {
   const lobbyScores = channel.lobby.scores;
 
-  const matchMaps = await supabase
-    .from("match_maps")
-    .select("id, status")
-    .eq("match_id", match.data.id)
-    .order("created_at", { ascending: false })
-    .limit(2);
+  const matchMaps = match.data.match_maps
+    .sort(
+      (a: { created_at: Date }, b: { created_at: Date }) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    )
+    .slice(-2);
 
-  if (matchMaps.error) {
-    throw matchMaps.error;
-  }
-
-  if (matchMaps.data.length === 0) {
+  if (matchMaps.length === 0) {
     console.log("No match maps found for match:", match.data.id);
     return;
   }
 
-  if (matchMaps.data[0].status != "finished") {
+  if (matchMaps[0].status != "finished") {
     console.log("Match map isn't finished yet.");
     return;
   }
 
-  const matchMapId = matchMaps.data[0].id;
+  const matchMapId = matchMaps[0].id;
 
   const vashScores = await supabase
     .from("scores")
@@ -251,6 +183,8 @@ export async function checkScores(
     .update({ status: "finished" })
     .eq("id", matchMapId);
 
+  socket.emit("scores-update", matchMapId);
+
   await checkMatchWin(supabase, channel, match);
 
   console.log("Finished updating scores for match map:", matchMapId);
@@ -259,27 +193,23 @@ export async function checkScores(
 export async function checkSettings(
   channel: BanchoMultiplayerChannel,
   supabase: SupabaseClient,
-  match: any
+  match: any,
+  socket: Socket
 ) {
   console.log("Checking settings");
 
-  const matchMap = await supabase
-    .from("match_maps")
-    .select(
-      "id, map_pool_maps(maps(osu_id), map_pool_map_mods(mods(code))), status"
-    )
-    .eq("match_id", match.data.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const matchMap = match.data.match_maps.sort(
+    (a: { created_at: Date }, b: { created_at: Date }) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  )[match.data.match_maps.length - 1];
 
-  if (!matchMap.data) {
+  if (!matchMap) {
     console.log("No match map found for match:", match.data.id);
     return;
   }
 
-  if (channel.lobby.playing && matchMap.data.status == "waiting") {
-    await changeAllPlayersState(5, match.data.id, supabase);
+  if (channel.lobby.playing && matchMap.status == "waiting") {
+    await changeAllPlayersState(5, match.data.id, supabase, socket);
 
     await supabase
       .from("match_maps")
@@ -289,42 +219,49 @@ export async function checkSettings(
     return;
   }
 
-  if (!channel.lobby.playing && matchMap.data.status == "playing") {
-    await changeAllPlayersState(3, match.data.id, supabase);
+  if (!channel.lobby.playing && matchMap.status == "playing") {
+    await changeAllPlayersState(3, match.data.id, supabase, socket);
 
     await supabase
       .from("match_maps")
       .update({ status: "finished" })
-      .eq("id", matchMap.data?.id);
+      .eq("id", matchMap.id);
 
     return;
   }
 
   // @ts-ignore
-  if (matchMap.data.map_pool_maps.maps.osu_id == channel.lobby.beatmapId) {
+  if (matchMap.map_pool_maps.maps.osu_id == channel.lobby.beatmapId) {
     return;
   }
 
   // @ts-ignore
-  await channel.lobby.setMap(matchMap.data.map_pool_maps.maps.osu_id);
+  await channel.lobby.setMap(matchMap.map_pool_maps.maps.osu_id);
   await channel.lobby.setMods(
     // @ts-ignore
-    "NF " + matchMap.data.map_pool_maps.map_pool_map_mods[0].mods.code,
+    "NF " + matchMap.map_pool_maps.map_pool_map_mods[0]?.mods.code,
     // @ts-ignore
-    matchMap.data.map_pool_maps.map_pool_map_mods[0].mods.code == "FM"
+    matchMap.map_pool_maps.map_pool_map_mods[0].mods.code == "FM"
   );
 }
 
 export async function checkReady(
   channel: BanchoMultiplayerChannel,
   supabase: SupabaseClient,
-  match: any
+  match: any,
+  socket: Socket
 ) {
   const lobbyPlayers = channel.lobby.slots.filter((slot) => slot?.user);
 
   for (const lobbyPlayer of lobbyPlayers) {
     if (lobbyPlayer.state === BanchoLobbyPlayerStates.Ready) {
-      await changeStateById(lobbyPlayer.user.id, 4, match.data.id, supabase);
+      await changeStateById(
+        lobbyPlayer.user.id,
+        4,
+        match.data.id,
+        supabase,
+        socket
+      );
     }
   }
 
@@ -351,46 +288,115 @@ export async function checkReady(
   console.log("Checked ready state and started the match");
 }
 
-async function checkOngoingStatus(
-  supabase: SupabaseClient,
-  matchId: number
-): Promise<boolean> {
-  const { data, error } = await supabase
-    .from("matches")
-    .select("ongoing")
-    .eq("id", matchId)
-    .single();
+async function clearMatchQueue(id: number, supabase: SupabaseClient) {
+  const matchQueue = await supabase
+    .from("match_queue")
+    .select("*")
+    .eq("match_id", id)
+    .maybeSingle();
 
-  if (error) {
-    console.error("Error checking match status:", error);
-    return false;
+  if (matchQueue.data?.position !== 1) {
+    return;
   }
 
-  return data.ongoing;
+  await supabase
+    .from("match_queue")
+    .update({ position: null })
+    .eq("match_id", id);
+}
+
+async function checkMatchParticipants(
+  channel: BanchoMultiplayerChannel,
+  supabase: SupabaseClient,
+  match: any,
+  socket: Socket
+) {
+  for (const matchParticipant of match.data.match_participants) {
+    for (const matchParticipantPlayer of matchParticipant.match_participant_players) {
+      const osuId =
+        matchParticipantPlayer.team_members.user_profiles.user_platforms.find(
+          (pf: any) => pf.platforms.name === "osu!"
+        )?.value;
+
+      console.log("Checking player: ", osuId);
+
+      const lobbyPlayer = await channel.lobby.getPlayerById(osuId);
+
+      if (
+        channel.lobby.slots.some((slot) => {
+          return slot?.user.id == osuId;
+        })
+      ) {
+        await supabase
+          .from("match_participant_players")
+          .update({ state: 3 })
+          .eq("id", matchParticipantPlayer.id);
+
+        console.log("Player is in the lobby:", osuId);
+      } else {
+        try {
+          await lobbyPlayer.user.whois();
+
+          await supabase
+            .from("match_participant_players")
+            .update({ state: 2 })
+            .eq("id", matchParticipantPlayer.id);
+
+          console.log("Player is not in the lobby:", osuId);
+        } catch (e) {
+          await supabase
+            .from("match_participant_players")
+            .update({ state: 1 })
+            .eq("id", matchParticipantPlayer.id);
+
+          console.log("Player is not in the lobby:", osuId);
+        }
+      }
+    }
+  }
+
+  socket.emit("match-participant-players-update", {
+    new: { id: match.data.id },
+  });
 }
 
 export async function createMatch(
   id: number,
   banchoClient: BanchoClient,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  socket: Socket
 ) {
   console.log("Creating match: ", id);
 
   await clearMatchQueue(id, supabase);
 
-  const match = await getMatch(supabase, id);
+  let match = await getMatch(supabase, id);
 
   let channel = (await getOrMakeChannel(supabase, banchoClient, match))!;
 
+  socket.emit("join-match", match.data.id);
+
+  socket.emit("matches-update", match.data.id);
+
+  socket.on("matches-update", async (payload) => {
+    match = await getMatch(supabase, id);
+  });
+
+  socket.on("match-maps-update", async (payload) => {
+    match = await getMatch(supabase, id);
+  });
+
   const interval = setInterval(async () => {
-    if (await checkOngoingStatus(supabase, match.data.id)) {
+    if (match.data.ongoing) {
       await channel.lobby.updateSettings();
-      await checkMatchParticipants(match, supabase, channel);
-      await checkScores(channel, supabase, match);
-      await checkSettings(channel, supabase, match);
-      await checkReady(channel, supabase, match);
+
+      await checkSettings(channel, supabase, match, socket);
+      await checkScores(channel, supabase, match, socket);
+      await checkMatchParticipants(channel, supabase, match, socket);
+      await checkReady(channel, supabase, match, socket);
     } else {
       clearInterval(interval);
+
       console.log(
         `Match ${match.data.id} is no longer ongoing, stopped all processes.`
       );
@@ -398,6 +404,6 @@ export async function createMatch(
   }, 5000);
 
   channel.on("message", async (msg) => {
-    message(msg, channel, supabase, match.data.id);
+    message(msg, channel, supabase, match.data.id, socket);
   });
 }
