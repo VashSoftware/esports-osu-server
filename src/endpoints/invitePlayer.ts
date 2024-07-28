@@ -1,3 +1,4 @@
+// @ts-ignore
 import { BanchoClient, BanchoMultiplayerChannel } from "bancho.js";
 export async function invitePlayer(
   playerOsuId: string,

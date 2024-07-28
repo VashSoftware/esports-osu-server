@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Socket } from "socket.io-client";
 
 export async function changeAllPlayersState(
   state: number,
   matchId: number,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  socket: Socket
 ) {
   const players = await supabase
     .from("match_participant_players")
@@ -21,13 +23,16 @@ export async function changeAllPlayersState(
       "id",
       players.data.map((player) => player.id)
     );
+
+  socket.emit("match-participant-players-update", { new: { id: matchId } });
 }
 
 export async function changeStateById(
   id: number,
   state: number,
   matchId: number,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  socket: Socket
 ) {
   const players = await supabase
     .from("match_participant_players")
@@ -50,4 +55,6 @@ export async function changeStateById(
       players.data.map((player) => player.id)
     )
     .select();
+
+  socket.emit("match-participant-players-update", { new: { id: matchId } });
 }
