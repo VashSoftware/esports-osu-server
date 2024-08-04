@@ -6,4 +6,5 @@ metadata:
 data:
   SUPABASE_URL: https://mdixwlzweijevgjmcsmt.supabase.co
   OSU_USERNAME: jollyWudchip
+  REALTIME_SERVER_DOMAIN: https://realtime.esports.vash.software:3001
   # OSU_CLIENT_ID=30152
