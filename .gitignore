@@ -175,3 +175,5 @@ dist
 .DS_Store
 
 k8s/secret.yaml
+
+certs/

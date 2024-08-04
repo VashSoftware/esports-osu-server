@@ -183,7 +183,7 @@ export async function checkScores(
     .update({ status: "finished" })
     .eq("id", matchMapId);
 
-  socket.emit("scores-update", matchMapId);
+  socket.emit("scores-update", { new: { id: match.data.id } });
 
   await checkMatchWin(supabase, channel, match);
 
@@ -327,27 +327,36 @@ async function checkMatchParticipants(
           return slot?.user.id == osuId;
         })
       ) {
-        await supabase
-          .from("match_participant_players")
-          .update({ state: 3 })
-          .eq("id", matchParticipantPlayer.id);
+        await changeStateById(
+          matchParticipantPlayer.id,
+          3,
+          match.data.id,
+          supabase,
+          socket
+        );
 
         console.log("Player is in the lobby:", osuId);
       } else {
         try {
           await lobbyPlayer.user.whois();
 
-          await supabase
-            .from("match_participant_players")
-            .update({ state: 2 })
-            .eq("id", matchParticipantPlayer.id);
+          await changeStateById(
+            matchParticipantPlayer.id,
+            2,
+            match.data.id,
+            supabase,
+            socket
+          );
 
           console.log("Player is not in the lobby:", osuId);
         } catch (e) {
-          await supabase
-            .from("match_participant_players")
-            .update({ state: 1 })
-            .eq("id", matchParticipantPlayer.id);
+          await changeStateById(
+            matchParticipantPlayer.id,
+            1,
+            match.data.id,
+            supabase,
+            socket
+          );
 
           console.log("Player is not in the lobby:", osuId);
         }
