@@ -88,9 +88,9 @@ async function pollMatches() {
     return;
   }
 
-  createMatch(data.match_id, banchoClient, supabase, socket);
+  socket.emit("match-queue-update", {});
 
-  socket.emit("match_queue_update", {});
+  createMatch(data.match_id, banchoClient, supabase, socket);
 }
 
 setInterval(pollMatches, 10000);
@@ -112,6 +112,8 @@ async function pollQuickQueue() {
   if (quickQueue.data.length < 2) {
     return;
   }
+
+  socket.emit("quick-queue-update", {});
 
   await supabase
     .from("quick_queue")
@@ -293,8 +295,6 @@ async function pollQuickQueue() {
     match_id: match[0].id,
     position: matchQueue.data!.length + 1,
   });
-
-  socket.emit("match_queue_update", {});
 }
 
 pollQuickQueue();

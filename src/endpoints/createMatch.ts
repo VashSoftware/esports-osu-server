@@ -383,6 +383,11 @@ export async function createMatch(
 
   let channel = (await getOrMakeChannel(supabase, banchoClient, match))!;
 
+  if (!channel) {
+    console.log("Failed to create channel for match:", id);
+    return;
+  }
+
   socket.emit("join-match", match.data.id);
 
   socket.emit("matches-update", match.data.id);
@@ -393,6 +398,10 @@ export async function createMatch(
 
   socket.on("match-maps-update", async (payload) => {
     match = await getMatch(supabase, id);
+  });
+
+  channel.on("message", async (msg) => {
+    message(msg, channel, supabase, match.data.id, socket);
   });
 
   const interval = setInterval(async () => {
@@ -411,8 +420,4 @@ export async function createMatch(
       );
     }
   }, 5000);
-
-  channel.on("message", async (msg) => {
-    message(msg, channel, supabase, match.data.id, socket);
-  });
 }
