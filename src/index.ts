@@ -36,9 +36,7 @@ socket.on("connect_error", (error) => {
 
 socket.on("disconnect", (reason) => {
   console.warn("Socket.IO disconnected:", reason); // Add 'disconnect' handler
-  if (reason === "io server disconnect") {
-    socket.connect(); // Try to reconnect if server initiated
-  }
+  socket.connect();
 });
 
 socket.on("reconnect", (attemptNumber) => {

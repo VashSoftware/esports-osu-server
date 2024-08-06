@@ -1,0 +1,10 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: osu-server-ingress
+spec:
+  defaultBackend:
+    service:
+      name: osu-server-service  # The service name you'll create below
+      port:
+        number: 3000          # Match your app's port
