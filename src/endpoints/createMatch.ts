@@ -251,6 +251,8 @@ export async function checkReady(
   match: any,
   socket: Socket
 ) {
+  console.log("Checking ready state and started the match");
+
   const lobbyPlayers = channel.lobby.slots.filter((slot) => slot?.user);
 
   for (const lobbyPlayer of lobbyPlayers) {
@@ -279,13 +281,13 @@ export async function checkReady(
   if (
     lobbyPlayers.some((slot) => slot.state !== BanchoLobbyPlayerStates.Ready)
   ) {
-    console.log("Not all players are ready");
+    await channel.sendMessage(
+      "Not all players are ready. Map will start automatically once all players are ready."
+    );
     return;
   }
 
   await channel.lobby.startMatch();
-
-  console.log("Checked ready state and started the match");
 }
 
 async function clearMatchQueue(id: number, supabase: SupabaseClient) {
