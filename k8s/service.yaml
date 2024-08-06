@@ -2,17 +2,10 @@ apiVersion: v1
 kind: Service
 metadata:
   name: osu-server-service
-  namespace: default
 spec:
   selector:
     app: osu-server
-  type: LoadBalancer
-  sessionAffinity: ClientIP
-  sessionAffinityConfig:
-    clientIP:
-      timeoutSeconds: 10800
   ports:
-  - name: http
-    protocol: TCP
-    port: 80
-    targetPort: 3000
+  - protocol: TCP
+    port: 3000
+    targetPort: 3000 
