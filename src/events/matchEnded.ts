@@ -36,7 +36,11 @@ async function handleMatchWin(
 
   await supabase
     .from("matches")
-    .update({ ongoing: false })
+    .update({
+      ongoing: false,
+      winner_participant_id:
+        match.data.match_participants[matchParticipantPlayerIndex].id,
+    })
     .eq("id", match.data.id);
 
   // Wait for 60 seconds
